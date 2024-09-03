@@ -141,28 +141,51 @@ namespace UtilityNetworkPropertiesExtractor
                             cps.Progressor.Status = (cps.Progressor.Value * 100 / cps.Progressor.Max) + @"% Completed";
                             cps.Progressor.Message = progressMessage;
 
+                            //Get list of all Fields.  Set the Expression if field "assetype" exists on the table
                             List<FieldDescription> fieldDescList = standaloneTable.GetFieldDescriptions();
                             FieldDescription assetTypeRec = fieldDescList.Where(x => x.Name.ToUpper() == "ASSETTYPE").FirstOrDefault();
 
-                            if (assetTypeRec != null)
+                            if (standaloneTable is SubtypeGroupTable subtypeGroupTable) // If Subtype Group Table, need to process all SubTables
                             {
-                                CIMStandaloneTable cimStandaloneTable = standaloneTable.GetDefinition();
-                                CIMExpressionInfo cimExpressionInfo = cimStandaloneTable.DisplayExpressionInfo;
-
-                                if (cimExpressionInfo is null)
-                                    cimExpressionInfo = new CIMExpressionInfo();
-
-                                cimExpressionInfo.Title = "Asset Group, Asset Type and Objectid";
-                                cimExpressionInfo.Expression = "return DomainName($feature, 'ASSETGROUP', $feature.ASSETGROUP, $feature.ASSETGROUP) + ', ' + DomainName($feature, 'ASSETTYPE', $feature.ASSETTYPE, $feature.ASSETGROUP) + ' ' + $feature.OBJECTID"; ;
-
-                                cimStandaloneTable.DisplayExpressionInfo = cimExpressionInfo;
-                                standaloneTable.SetDefinition(cimStandaloneTable);
+                                foreach (StandaloneTable subTable in subtypeGroupTable.StandaloneTables)
+                                {
+                                    if (assetTypeRec != null)
+                                        SetStandaloneTableExpression(subTable, true);
+                                }
+                            }
+                            else
+                            {
+                                if (assetTypeRec != null)
+                                    SetStandaloneTableExpression(standaloneTable, false);
                             }
                         }
                     }, cps.Progressor);
                 }
                 MapView.Active.DrawingPaused = false;
             });
+        }
+
+        private static void SetStandaloneTableExpression(StandaloneTable standaloneTable, bool isSubTable)
+        {
+            CIMStandaloneTable cimStandaloneTable = standaloneTable.GetDefinition();
+            CIMExpressionInfo cimExpressionInfo = cimStandaloneTable.DisplayExpressionInfo;
+
+            if (cimExpressionInfo is null)
+                cimExpressionInfo = new CIMExpressionInfo();
+
+            if (isSubTable)
+            {
+                cimExpressionInfo.Title = "Asset Type and Objectid";
+                cimExpressionInfo.Expression = "return DomainName($feature, 'ASSETTYPE', $feature.ASSETTYPE, $feature.ASSETGROUP) + ' ' + $feature.OBJECTID";
+            }
+            else
+            {
+                cimExpressionInfo.Title = "Asset Group, Asset Type and Objectid";
+                cimExpressionInfo.Expression = "return DomainName($feature, 'ASSETGROUP', $feature.ASSETGROUP, $feature.ASSETGROUP) + ', ' + DomainName($feature, 'ASSETTYPE', $feature.ASSETTYPE, $feature.ASSETGROUP) + ' ' + $feature.OBJECTID";
+            }
+
+            cimStandaloneTable.DisplayExpressionInfo = cimExpressionInfo;
+            standaloneTable.SetDefinition(cimStandaloneTable);
         }
     }
 }
