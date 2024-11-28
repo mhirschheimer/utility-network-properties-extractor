@@ -49,6 +49,7 @@
           <button refID="UtilityNetworkPropertiesExtractor_FieldSettingsInMapButton" size="middle" />
           <button refID="UtilityNetworkPropertiesExtractor_ProjectItemsButton" size="middle" />
           <button refID="UtilityNetworkPropertiesExtractor_ExtractLocationButton" size="middle" />
+          <button refID="UtilityNetworkPropertiesExtractor_EditTemplatesButton" size="large" />
         </group>
         <group id="UtilityNetworkPropertiesExtractor_Group2" caption="Efficiency Tools" appearsOnAddInTab="false" keytip="AG">
           <button refID="UtilityNetworkPropertiesExtractor_FieldSettingsInMapImportButton" size="middle" />
@@ -168,6 +169,9 @@
         </button>
         <button id="UtilityNetworkPropertiesExtractor_ExtractLocationButton" caption="Extract Location" className="ExtractLocationButton" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/FolderOpenState32.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/FolderOpenState32.png" keytip="YV">
           <tooltip heading="Tooltip Heading">Display Extract Location<disabledText /></tooltip>
+        </button>
+        <button id="UtilityNetworkPropertiesExtractor_EditTemplatesButton" caption="EditTemplatesButton" className="EditTemplatesButton" loadOnClick="true" smallImage="GenericButtonBlue16" largeImage="GenericButtonBlue32">
+          <tooltip heading="Tooltip Heading">Tooltip text<disabledText /></tooltip>
         </button>
       </controls>
     </insertModule>
