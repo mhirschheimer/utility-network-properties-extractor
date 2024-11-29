@@ -64,13 +64,14 @@ namespace UtilityNetworkPropertiesExtractor
 
 
                     //Get all properties defined in the class.  This will be used to generate the CSV file
+                    GroupAndPresetInfo emptyGPI = new GroupAndPresetInfo();
+                    PropertyInfo[] gpiProperties = Common.GetPropertiesOfClass(emptyGPI);
+                    List<GroupAndPresetInfo> gpiList = new List<GroupAndPresetInfo>();
+
+
+                    //Get all properties defined in the class.  This will be used to generate the CSV file
                     CSVLayout emptyRec = new CSVLayout();
-                    PropertyInfo[] properties = Common.GetPropertiesOfClass(emptyRec);
-
-                    //Write column headers based on properties in the class
-                    string columnHeader = Common.ExtractClassPropertyNamesToString(properties);
-                    sw.WriteLine(columnHeader);
-
+                    PropertyInfo[] properties = Common.GetPropertiesOfClass(emptyRec);                   
                     List<CSVLayout> csvLayoutList = new List<CSVLayout>();
 
                     int layerPos = 1;
@@ -112,35 +113,60 @@ namespace UtilityNetworkPropertiesExtractor
                             CIMFeatureLayer layerDef = layer.GetDefinition() as CIMFeatureLayer;
                             if (layerDef != null)
                             {
-                                List<CIMEditingTemplate> layerTemplates = layerDef.FeatureTemplates?.ToList();
-                                if (layerTemplates.Count > 0)
+                                List<CIMEditingTemplate> editingTemplates = layerDef.FeatureTemplates?.ToList();
+                                if (editingTemplates.Count > 0)
                                 {
-
-                                    //foreach (CIMGroupEditingTemplate groupTemplate in layerTemplates)
-                                    //{
-                                    //    groupTemplate.Parts
-                                    //}
-
-                                    foreach (CIMEditingTemplate template in layerTemplates)
+                                    foreach (CIMEditingTemplate template in editingTemplates)
                                     {
-                                        CIMRowTemplate cimRowTemplate = template as CIMRowTemplate;
-                                        if (cimRowTemplate != null)
-                                        {
-                                            IDictionary<string, object> templateDict = cimRowTemplate.DefaultValues;
-                                            foreach (KeyValuePair<string, object> pair in templateDict)
+                                        if (template is CIMGroupEditingTemplate cimGroupEditingTemplate)
+                                        { 
+                                            //Add the componets to the group/preset template.
+                                            string parts = string.Empty;
+                                            foreach (CIMGroupEditingTemplatePart cimGroupEditingTemplatePart in cimGroupEditingTemplate.Parts)
                                             {
-
-                                                CSVLayout templateRec = new CSVLayout()
+                                                if (cimGroupEditingTemplatePart.TransformationID == "esri_editing_un_association_builder")
+                                                    parts = "UN Association Builder";
+                                                else
+                                                    parts = cimGroupEditingTemplatePart.LayerURI;
+                                                    
+                                                GroupAndPresetInfo gpi = new GroupAndPresetInfo()
                                                 {
                                                     LayerPos = layerPos.ToString(),
                                                     LayerType = layerType,
-                                                    LayerName = layer.Name,
                                                     GroupLayerName = groupLayerName,
-                                                    TemplateName = template.Name,
-                                                    FieldName = pair.Key,
-                                                    DefaultValue = pair.Value.ToString()
+                                                    LayerName = Common.EncloseStringInDoubleQuotes(layer.Name),
+                                                    GroupOrPresetName = Common.EncloseStringInDoubleQuotes(cimGroupEditingTemplate.Name),
+                                                    Parts = parts
                                                 };
-                                                csvLayoutList.Add(templateRec);
+                                                    
+                                                gpiList.Add(gpi);
+                                            }
+                                        }
+                                        else if (template is CIMRowTemplate cimRowTemplate)
+                                        {
+
+                                            if (cimRowTemplate.Tags == "Hidden")
+                                            {
+                                                var foo = cimRowTemplate.Name;
+                                            }
+                                            else { 
+                                                IDictionary<string, object> templateDict = cimRowTemplate.DefaultValues;
+                                                foreach (KeyValuePair<string, object> pair in templateDict)
+                                                {
+
+                                                    CSVLayout templateRec = new CSVLayout()
+                                                    {
+                                                        LayerPos = layerPos.ToString(),
+                                                        LayerType = layerType,
+                                                        LayerName = Common.EncloseStringInDoubleQuotes(layer.Name),
+                                                        GroupLayerName = groupLayerName,
+                                                        TemplateName = Common.EncloseStringInDoubleQuotes(template.Name),
+                                                        FieldName = pair.Key,
+                                                        DefaultValue = pair.Value.ToString(),
+                                                        CIMPath = layer.URI
+                                                    };
+                                                    csvLayoutList.Add(templateRec);
+                                                }
                                             }
                                         }
                                     }
@@ -172,6 +198,20 @@ namespace UtilityNetworkPropertiesExtractor
                     }
 
                     //Write body of report
+                    string gpiColumnHeader = Common.ExtractClassPropertyNamesToString(gpiProperties);
+                    sw.WriteLine(gpiColumnHeader);
+
+                    foreach (GroupAndPresetInfo gpiRow in gpiList)
+                    {
+                        string output = Common.ExtractClassValuesToString(gpiRow, gpiProperties);
+                        sw.WriteLine(output);
+                    }
+
+                    sw.WriteLine("");
+
+                    string columnHeader = Common.ExtractClassPropertyNamesToString(properties);
+                    sw.WriteLine(columnHeader);
+
                     foreach (CSVLayout row in csvLayoutList)
                     {
                         string output = Common.ExtractClassValuesToString(row, properties);
@@ -222,7 +262,8 @@ namespace UtilityNetworkPropertiesExtractor
                             csvLayout.TemplateName = template.Name;
                             csvLayout.FieldName = pair.Key;
                             csvLayout.DefaultValue = pair.Value.ToString();
-                            
+                            csvLayout.CIMPath = standaloneTable.URI;
+
                             csvLayoutList.Add(csvLayout);
                         }
                     }
@@ -234,8 +275,21 @@ namespace UtilityNetworkPropertiesExtractor
         }
 
 
+
+        private class GroupAndPresetInfo
+        {
+            public string GroupAndPresets { get; set; }
+            public string LayerPos { get; set; }
+            public string LayerType { get; set; }
+            public string GroupLayerName { get; set; }
+            public string LayerName { get; set; }
+            public string GroupOrPresetName { get; set; }
+            public string Parts { get; set; }
+        }
+
         private class CSVLayout
         {
+            public string EditTemplates { get; set; }
             public string LayerPos { get; set; }
             public string LayerType { get; set; }
             public string GroupLayerName { get; set; }
@@ -243,6 +297,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string TemplateName { get; set; }
             public string FieldName { get; set; }
             public string DefaultValue { get; set; }
+            public string CIMPath { get; set; }
         }
     }
 }
