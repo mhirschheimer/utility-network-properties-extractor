@@ -84,6 +84,7 @@ namespace UtilityNetworkPropertiesExtractor
                     IReadOnlyList<MapMember> mapMemberList = MapView.Active.Map.GetMapMembersAsFlattenedList();
                     foreach (MapMember mapMember in mapMemberList)
                     {
+                        //Layers
                         if (mapMember is Layer layer)
                         {
                             //Determine if in a group layer
@@ -110,6 +111,8 @@ namespace UtilityNetworkPropertiesExtractor
                                     break;
                             }
 
+
+                            //Determine if layer has any edit templates
                             CIMFeatureLayer layerDef = layer.GetDefinition() as CIMFeatureLayer;
                             if (layerDef != null)
                             {
@@ -118,6 +121,7 @@ namespace UtilityNetworkPropertiesExtractor
                                 {
                                     foreach (CIMEditingTemplate template in editingTemplates)
                                     {
+                                        //Group or Preset templates
                                         if (template is CIMGroupEditingTemplate cimGroupEditingTemplate)
                                         { 
                                             //Add the componets to the group/preset template.
@@ -142,18 +146,15 @@ namespace UtilityNetworkPropertiesExtractor
                                                 gpiList.Add(gpi);
                                             }
                                         }
+                                        //"standalone" Edit template
                                         else if (template is CIMRowTemplate cimRowTemplate)
                                         {
-
-                                            if (cimRowTemplate.Tags == "Hidden")
-                                            {
-                                                var foo = cimRowTemplate.Name;
-                                            }
-                                            else { 
+                                            if (cimRowTemplate.Tags != "Hidden")
+                                            { 
                                                 IDictionary<string, object> templateDict = cimRowTemplate.DefaultValues;
                                                 foreach (KeyValuePair<string, object> pair in templateDict)
                                                 {
-
+                                                    //Write out properties of the edit template
                                                     CSVLayout templateRec = new CSVLayout()
                                                     {
                                                         LayerPos = layerPos.ToString(),
@@ -181,7 +182,6 @@ namespace UtilityNetworkPropertiesExtractor
                             IReadOnlyList<StandaloneTable> standaloneTablesList = subtypeGroupTable.StandaloneTables;
                             foreach (StandaloneTable standaloneTable in standaloneTablesList)
                                 layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, ref csvLayoutList);
-
                         }
 
                         //Standalone Table
@@ -189,9 +189,6 @@ namespace UtilityNetworkPropertiesExtractor
                         {
                             layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
                             layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, ref csvLayoutList);
-
-                            //Since already added Table info to CsvLayoutList, don't do it again.
-                            //addToCsvLayoutList = false;
                         }
                         
                         layerPos += 1;
@@ -224,10 +221,8 @@ namespace UtilityNetworkPropertiesExtractor
             });
         }
 
-
         private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, ref List<CSVLayout> csvLayoutList)
         {
-
             CSVLayout csvLayout = new CSVLayout()
             {
                 GroupLayerName = Common.EncloseStringInDoubleQuotes(groupLayerName),
@@ -236,23 +231,21 @@ namespace UtilityNetworkPropertiesExtractor
                 LayerType = Common.GetLayerTypeDescription(standaloneTable)
             };
 
-            string tableType = "Table";
             //Subtype Group Table entry
             if (standaloneTable is SubtypeGroupTable)
             {
                 csvLayout.GroupLayerName = Common.EncloseStringInDoubleQuotes(standaloneTable.Name);
                 csvLayout.LayerName = string.Empty;
-                tableType = "Subtype Group Table";
             }
 
-            CIMStandaloneTable cimStandaloneTable = standaloneTable.GetDefinition();
+            //Get CIM defintion for standalone table
+            CIMStandaloneTable cimStandaloneTableDef = standaloneTable.GetDefinition();
             
-            IList<CIMEditingTemplate> cimEditingTemplates = cimStandaloneTable.RowTemplates;
+            IList<CIMEditingTemplate> cimEditingTemplates = cimStandaloneTableDef.RowTemplates;
             if (cimEditingTemplates != null)
             {
                 foreach (CIMEditingTemplate template in cimEditingTemplates)
                 {
-
                     CIMRowTemplate rowTemplate = template as CIMRowTemplate;
                     if (rowTemplate != null)
                     {
