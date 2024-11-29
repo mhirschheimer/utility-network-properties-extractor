@@ -11,14 +11,19 @@
    limitations under the License.
 */
 using ArcGIS.Core.CIM;
+using ArcGIS.Core.Data;
+using ArcGIS.Core.Data.DDL;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
+using ArcGIS.Desktop.Internal.Mapping.Events;
 using ArcGIS.Desktop.Mapping;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.ServiceModel;
 using System.Threading.Tasks;
+using System.Windows;
 using Button = ArcGIS.Desktop.Framework.Contracts.Button;
 using MessageBox = System.Windows.Forms.MessageBox;
 
@@ -80,6 +85,9 @@ namespace UtilityNetworkPropertiesExtractor
                     string layerContainer = string.Empty;
                     string layerType = string.Empty;
 
+                    //Get datasouces in map.  This will be used to get domain descriptions on defaulted values (if applicable)
+                    List<DataSourceInMap> DataSourceInMapList = DataSourcesInMapHelper.GetDataSourcesInMap();
+
                     //Get list of all layers in the map
                     IReadOnlyList<MapMember> mapMemberList = MapView.Active.Map.GetMapMembersAsFlattenedList();
                     foreach (MapMember mapMember in mapMemberList)
@@ -119,6 +127,23 @@ namespace UtilityNetworkPropertiesExtractor
                                 List<CIMEditingTemplate> editingTemplates = layerDef.FeatureTemplates?.ToList();
                                 if (editingTemplates.Count > 0)
                                 {
+
+                                    FeatureClassDefinition fcDefinition = getFeatureClassDefinitionOfMapMember(DataSourceInMapList, layer);
+                                    if (fcDefinition == null)
+                                    {
+                                        MessageBox.Show("Couldn't find definition");
+                                        return;
+                                    }
+
+                                    FeatureLayer featureLayer = layer as FeatureLayer;
+                                    IReadOnlyList<Field> fieldsList = fcDefinition.GetFields();
+                                    IReadOnlyList<Subtype> subtypesList = fcDefinition.GetSubtypes();
+                                    
+                                    Subtype subtype = null;
+                                    if (featureLayer.IsSubtypeLayer && subtypesList.Count != 0)
+                                        subtype = subtypesList.Where(x => x.GetCode() == featureLayer.SubtypeValue).FirstOrDefault();
+
+
                                     foreach (CIMEditingTemplate template in editingTemplates)
                                     {
                                         //Group or Preset templates
@@ -150,10 +175,46 @@ namespace UtilityNetworkPropertiesExtractor
                                         else if (template is CIMRowTemplate cimRowTemplate)
                                         {
                                             if (cimRowTemplate.Tags != "Hidden")
-                                            { 
+                                            {
+                                                string dictValue = string.Empty;
+
                                                 IDictionary<string, object> templateDict = cimRowTemplate.DefaultValues;
                                                 foreach (KeyValuePair<string, object> pair in templateDict)
                                                 {
+                                                    string domainDescription = string.Empty;
+                                                    
+                                                    if (pair.Value == null)
+                                                        dictValue = string.Empty;
+                                                    else
+                                                    {
+                                                        dictValue = pair.Value.ToString();
+
+                                                        //now check if the field has a domain value
+                                                        Field field = fieldsList.Where(x => x.Name.ToLower() == pair.Key.ToLower()).FirstOrDefault();
+                                                        if (field != null)
+                                                        {
+
+                                                            if (field.Name.ToLower() == fcDefinition.GetSubtypeField().ToLower())
+                                                                domainDescription = subtype.GetName();
+                                                            else
+                                                            {
+                                                                Domain domain = field.GetDomain(subtype);
+                                                                if (domain != null)
+                                                                {
+                                                                    if (domain is CodedValueDomain codedValueDomain)
+                                                                    {
+                                                                        if (pair.Value != null)
+                                                                        {
+                                                                            if (!string.IsNullOrEmpty(pair.Value.ToString()))
+                                                                                domainDescription = Common.GetCodedValueDomainValue(codedValueDomain, dictValue);
+                                                                        }
+                                                                    }
+
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
                                                     //Write out properties of the edit template
                                                     CSVLayout templateRec = new CSVLayout()
                                                     {
@@ -163,10 +224,12 @@ namespace UtilityNetworkPropertiesExtractor
                                                         GroupLayerName = groupLayerName,
                                                         TemplateName = Common.EncloseStringInDoubleQuotes(template.Name),
                                                         FieldName = pair.Key,
-                                                        DefaultValue = pair.Value.ToString(),
+                                                        DefaultValue = dictValue,
+                                                        DomainDescription = domainDescription,
                                                         CIMPath = layer.URI
                                                     };
                                                     csvLayoutList.Add(templateRec);
+
                                                 }
                                             }
                                         }
@@ -267,7 +330,24 @@ namespace UtilityNetworkPropertiesExtractor
             return layerPos; // need to identify next layer position for "table in group layers"
         }
 
+        private static FeatureClassDefinition getFeatureClassDefinitionOfMapMember(List<DataSourceInMap> DataSourceInMapList, MapMember mapMember)
+        {
+            foreach (DataSourceInMap dataSource in DataSourceInMapList)
+            {
+                FeatureClassDefinition fcDefinition;
+                IReadOnlyList<FeatureClassDefinition> fcDefinitions = dataSource.Geodatabase.GetDefinitions<FeatureClassDefinition>();
 
+                if (mapMember is FeatureLayer featureLayer)
+                {
+                    fcDefinition = fcDefinitions.Where(x => x.GetName() == featureLayer.GetFeatureClass().GetName()).FirstOrDefault();
+                    if (fcDefinition != null)
+                    {
+                        return fcDefinition;
+                    }
+                }
+            }
+            return null;
+        }
 
         private class GroupAndPresetInfo
         {
@@ -290,6 +370,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string TemplateName { get; set; }
             public string FieldName { get; set; }
             public string DefaultValue { get; set; }
+            public string DomainDescription { get; set; }
             public string CIMPath { get; set; }
         }
     }
