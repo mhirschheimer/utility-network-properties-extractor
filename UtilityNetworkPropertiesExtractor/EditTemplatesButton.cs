@@ -195,7 +195,15 @@ namespace UtilityNetworkPropertiesExtractor
                                                         {
 
                                                             if (field.Name.ToLower() == fcDefinition.GetSubtypeField().ToLower())
-                                                                domainDescription = subtype.GetName();
+                                                            {
+                                                                if (featureLayer.IsSubtypeLayer)
+                                                                    domainDescription = subtype.GetName();
+                                                                else
+                                                                {
+                                                                    Subtype thisSubtype = subtypesList.Where(x => x.GetCode().ToString() == dictValue).FirstOrDefault();
+                                                                    domainDescription = thisSubtype.GetName();
+                                                                }
+                                                            }
                                                             else
                                                             {
                                                                 Domain domain = field.GetDomain(subtype);
@@ -241,17 +249,29 @@ namespace UtilityNetworkPropertiesExtractor
                         //Subtype Group Table
                         else if (mapMember is SubtypeGroupTable subtypeGroupTable)
                         {
+                           
                             //Include "sub tables" in the report 
                             IReadOnlyList<StandaloneTable> standaloneTablesList = subtypeGroupTable.StandaloneTables;
+                            TableDefinition tableDefinition = getTableDefinitionOfMapMember(DataSourceInMapList, standaloneTablesList.FirstOrDefault());
+                            IReadOnlyList<Field> fieldsList = tableDefinition.GetFields();
+                            IReadOnlyList<Subtype> subtypesList = tableDefinition.GetSubtypes();
+
                             foreach (StandaloneTable standaloneTable in standaloneTablesList)
-                                layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, ref csvLayoutList);
+                            {
+                                
+                                layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, tableDefinition, fieldsList, subtypesList, ref csvLayoutList);
+                            }
                         }
 
                         //Standalone Table
                         else if (mapMember is StandaloneTable standaloneTable)
                         {
+                            TableDefinition tableDefinition = getTableDefinitionOfMapMember(DataSourceInMapList, standaloneTable);
+                            IReadOnlyList<Field> fieldsList = tableDefinition.GetFields();
+                            IReadOnlyList<Subtype> subtypesList = tableDefinition.GetSubtypes();
+                            
                             layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
-                            layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, ref csvLayoutList);
+                            layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, tableDefinition, fieldsList, subtypesList, ref csvLayoutList);
                         }
                         
                         layerPos += 1;
@@ -284,7 +304,7 @@ namespace UtilityNetworkPropertiesExtractor
             });
         }
 
-        private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, ref List<CSVLayout> csvLayoutList)
+        private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, TableDefinition tableDefinition, IReadOnlyList<Field> fieldsList, IReadOnlyList<Subtype> subtypesList,  ref List<CSVLayout> csvLayoutList)
         {
             CSVLayout csvLayout = new CSVLayout()
             {
@@ -301,6 +321,10 @@ namespace UtilityNetworkPropertiesExtractor
                 csvLayout.LayerName = string.Empty;
             }
 
+            Subtype subtype = null;
+            if (standaloneTable.IsSubtypeTable && subtypesList.Count != 0)
+                subtype = subtypesList.Where(x => x.GetCode() == standaloneTable.SubtypeValue).FirstOrDefault();
+
             //Get CIM defintion for standalone table
             CIMStandaloneTable cimStandaloneTableDef = standaloneTable.GetDefinition();
             
@@ -312,12 +336,53 @@ namespace UtilityNetworkPropertiesExtractor
                     CIMRowTemplate rowTemplate = template as CIMRowTemplate;
                     if (rowTemplate != null)
                     {
+                        string dictValue = string.Empty;
+
                         IDictionary<string, object> templateDict = rowTemplate.DefaultValues;
                         foreach (KeyValuePair<string, object> pair in templateDict)
                         {
+                            string domainDescription = string.Empty;
+                            if (pair.Value == null)
+                                dictValue = string.Empty;
+                            else
+                            {
+                                dictValue = pair.Value.ToString();
+
+                                //now check if the field has a domain value
+                                Field field = fieldsList.Where(x => x.Name.ToLower() == pair.Key.ToLower()).FirstOrDefault();
+                                if (field != null)
+                                {
+
+                                    if (field.Name.ToLower() == tableDefinition.GetSubtypeField().ToLower())
+                                        if (standaloneTable.IsSubtypeTable)
+                                            domainDescription = subtype.GetName();
+                                        else
+                                        {
+                                            Subtype thisSubtype = subtypesList.Where(x => x.GetCode().ToString() == dictValue).FirstOrDefault();
+                                            domainDescription = thisSubtype.GetName();
+                                        }
+                                    else
+                                    {
+                                        Domain domain = field.GetDomain(subtype);
+                                        if (domain != null)
+                                        {
+                                            if (domain is CodedValueDomain codedValueDomain)
+                                            {
+                                                if (pair.Value != null)
+                                                {
+                                                    if (!string.IsNullOrEmpty(pair.Value.ToString()))
+                                                        domainDescription = Common.GetCodedValueDomainValue(codedValueDomain, dictValue);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             csvLayout.TemplateName = template.Name;
                             csvLayout.FieldName = pair.Key;
-                            csvLayout.DefaultValue = pair.Value.ToString();
+                            csvLayout.DefaultValue = dictValue;
+                            csvLayout.DomainDescription = domainDescription;  
                             csvLayout.CIMPath = standaloneTable.URI;
 
                             csvLayoutList.Add(csvLayout);
@@ -348,6 +413,27 @@ namespace UtilityNetworkPropertiesExtractor
             }
             return null;
         }
+
+        private static TableDefinition getTableDefinitionOfMapMember(List<DataSourceInMap> DataSourceInMapList, MapMember mapMember)
+        {
+            foreach (DataSourceInMap dataSource in DataSourceInMapList)
+            {
+                TableDefinition tableDefinition;
+                IReadOnlyList<TableDefinition> tableDefinitions = dataSource.Geodatabase.GetDefinitions<TableDefinition>();
+
+                if (mapMember is StandaloneTable standaloneTable)
+                {
+                    tableDefinition = tableDefinitions.Where(x => x.GetName() == standaloneTable.GetTable().GetName()).FirstOrDefault();
+                    if (tableDefinition != null)
+                    {
+                        return tableDefinition;
+                    }
+                }
+            }
+            return null;
+        }
+
+
 
         private class GroupAndPresetInfo
         {
