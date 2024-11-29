@@ -12,18 +12,14 @@
 */
 using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
-using ArcGIS.Core.Data.DDL;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
-using ArcGIS.Desktop.Internal.Mapping.Events;
 using ArcGIS.Desktop.Mapping;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.ServiceModel;
 using System.Threading.Tasks;
-using System.Windows;
 using Button = ArcGIS.Desktop.Framework.Contracts.Button;
 using MessageBox = System.Windows.Forms.MessageBox;
 
@@ -31,6 +27,8 @@ namespace UtilityNetworkPropertiesExtractor
 {
     internal class EditTemplatesButton : Button
     {
+
+        private const string _subtypeFieldText = "Subtype Field";
 
         protected async override void OnClick()
         {
@@ -44,7 +42,7 @@ namespace UtilityNetworkPropertiesExtractor
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Extracting Fields Info");
+                MessageBox.Show(ex.Message, "Extracting Edit Templates Info");
             }
             finally
             {
@@ -52,47 +50,45 @@ namespace UtilityNetworkPropertiesExtractor
             }
         }
 
-        private static Task EditTemplateMasterAsync()
+        public static Task EditTemplateMasterAsync()
         {
             string mesg = string.Empty;
 
             return QueuedTask.Run(() =>
             {
-                string outputFile = Common.BuildCsvNameContainingMapName("EditTemplates");
-                using (StreamWriter sw = new StreamWriter(outputFile))
+            string outputFile = Common.BuildCsvNameContainingMapName("EditTemplates");
+            using (StreamWriter sw = new StreamWriter(outputFile))
+            {
+                //Header information
+                Common.WriteHeaderInfoForMap(sw, "Edit Templates");
+                sw.WriteLine("Layers," + MapView.Active.Map.GetLayersAsFlattenedList().OfType<Layer>().Count());
+                sw.WriteLine("Standalone Tables," + Common.GetCountOfAllTablesInMap());
+                sw.WriteLine();
+
+                //Get all properties defined in the class.  This will be used to generate the CSV file
+                GroupAndPresetInfo emptyGPI = new GroupAndPresetInfo();
+                PropertyInfo[] gpiProperties = Common.GetPropertiesOfClass(emptyGPI);
+                List<GroupAndPresetInfo> gpiList = new List<GroupAndPresetInfo>();
+
+                //Get all properties defined in the class.  This will be used to generate the CSV file
+                CSVLayout emptyRec = new CSVLayout();
+                PropertyInfo[] properties = Common.GetPropertiesOfClass(emptyRec);
+                List<CSVLayout> csvLayoutList = new List<CSVLayout>();
+
+                int layerPos = 1;
+                string groupLayerName = string.Empty;
+                string prevGroupLayerName = string.Empty;
+                string layerContainer = string.Empty;
+                string layerType = string.Empty;
+
+                //Get datasouces in map.  This will be used to get domain descriptions on defaulted values (if applicable)
+                List<DataSourceInMap> DataSourceInMapList = DataSourcesInMapHelper.GetDataSourcesInMap();
+
+                //Get list of all layers in the map
+                IReadOnlyList<MapMember> mapMemberList = MapView.Active.Map.GetMapMembersAsFlattenedList();
+                foreach (MapMember mapMember in mapMemberList)
                 {
-                    //Header information
-                    Common.WriteHeaderInfoForMap(sw, "Edit Templates");
-                    sw.WriteLine("Layers," + MapView.Active.Map.GetLayersAsFlattenedList().OfType<Layer>().Count());
-                    sw.WriteLine("Standalone Tables," + Common.GetCountOfAllTablesInMap());
-                    sw.WriteLine();
-
-
-                    //Get all properties defined in the class.  This will be used to generate the CSV file
-                    GroupAndPresetInfo emptyGPI = new GroupAndPresetInfo();
-                    PropertyInfo[] gpiProperties = Common.GetPropertiesOfClass(emptyGPI);
-                    List<GroupAndPresetInfo> gpiList = new List<GroupAndPresetInfo>();
-
-
-                    //Get all properties defined in the class.  This will be used to generate the CSV file
-                    CSVLayout emptyRec = new CSVLayout();
-                    PropertyInfo[] properties = Common.GetPropertiesOfClass(emptyRec);                   
-                    List<CSVLayout> csvLayoutList = new List<CSVLayout>();
-
-                    int layerPos = 1;
-                    string groupLayerName = string.Empty;
-                    string prevGroupLayerName = string.Empty;
-                    string layerContainer = string.Empty;
-                    string layerType = string.Empty;
-
-                    //Get datasouces in map.  This will be used to get domain descriptions on defaulted values (if applicable)
-                    List<DataSourceInMap> DataSourceInMapList = DataSourcesInMapHelper.GetDataSourcesInMap();
-
-                    //Get list of all layers in the map
-                    IReadOnlyList<MapMember> mapMemberList = MapView.Active.Map.GetMapMembersAsFlattenedList();
-                    foreach (MapMember mapMember in mapMemberList)
-                    {
-                        //Layers
+                        //Determine generic layer information
                         if (mapMember is Layer layer)
                         {
                             //Determine if in a group layer
@@ -118,138 +114,43 @@ namespace UtilityNetworkPropertiesExtractor
                                     groupLayerName = Common.EncloseStringInDoubleQuotes(layerContainer);
                                     break;
                             }
-
-
-                            //Determine if layer has any edit templates
-                            CIMFeatureLayer layerDef = layer.GetDefinition() as CIMFeatureLayer;
-                            if (layerDef != null)
-                            {
-                                List<CIMEditingTemplate> editingTemplates = layerDef.FeatureTemplates?.ToList();
-                                if (editingTemplates.Count > 0)
-                                {
-
-                                    FeatureClassDefinition fcDefinition = getFeatureClassDefinitionOfMapMember(DataSourceInMapList, layer);
-                                    if (fcDefinition == null)
-                                    {
-                                        MessageBox.Show("Couldn't find definition");
-                                        return;
-                                    }
-
-                                    FeatureLayer featureLayer = layer as FeatureLayer;
-                                    IReadOnlyList<Field> fieldsList = fcDefinition.GetFields();
-                                    IReadOnlyList<Subtype> subtypesList = fcDefinition.GetSubtypes();
-                                    
-                                    Subtype subtype = null;
-                                    if (featureLayer.IsSubtypeLayer && subtypesList.Count != 0)
-                                        subtype = subtypesList.Where(x => x.GetCode() == featureLayer.SubtypeValue).FirstOrDefault();
-
-
-                                    foreach (CIMEditingTemplate template in editingTemplates)
-                                    {
-                                        //Group or Preset templates
-                                        if (template is CIMGroupEditingTemplate cimGroupEditingTemplate)
-                                        { 
-                                            //Add the componets to the group/preset template.
-                                            string parts = string.Empty;
-                                            foreach (CIMGroupEditingTemplatePart cimGroupEditingTemplatePart in cimGroupEditingTemplate.Parts)
-                                            {
-                                                if (cimGroupEditingTemplatePart.TransformationID == "esri_editing_un_association_builder")
-                                                    parts = "UN Association Builder";
-                                                else
-                                                    parts = cimGroupEditingTemplatePart.LayerURI;
-                                                    
-                                                GroupAndPresetInfo gpi = new GroupAndPresetInfo()
-                                                {
-                                                    LayerPos = layerPos.ToString(),
-                                                    LayerType = layerType,
-                                                    GroupLayerName = groupLayerName,
-                                                    LayerName = Common.EncloseStringInDoubleQuotes(layer.Name),
-                                                    GroupOrPresetName = Common.EncloseStringInDoubleQuotes(cimGroupEditingTemplate.Name),
-                                                    Parts = parts
-                                                };
-                                                    
-                                                gpiList.Add(gpi);
-                                            }
-                                        }
-                                        //"standalone" Edit template
-                                        else if (template is CIMRowTemplate cimRowTemplate)
-                                        {
-                                            if (cimRowTemplate.Tags != "Hidden")
-                                            {
-                                                string dictValue = string.Empty;
-
-                                                IDictionary<string, object> templateDict = cimRowTemplate.DefaultValues;
-                                                foreach (KeyValuePair<string, object> pair in templateDict)
-                                                {
-                                                    string domainDescription = string.Empty;
-                                                    
-                                                    if (pair.Value == null)
-                                                        dictValue = string.Empty;
-                                                    else
-                                                    {
-                                                        dictValue = pair.Value.ToString();
-
-                                                        //now check if the field has a domain value
-                                                        Field field = fieldsList.Where(x => x.Name.ToLower() == pair.Key.ToLower()).FirstOrDefault();
-                                                        if (field != null)
-                                                        {
-
-                                                            if (field.Name.ToLower() == fcDefinition.GetSubtypeField().ToLower())
-                                                            {
-                                                                if (featureLayer.IsSubtypeLayer)
-                                                                    domainDescription = subtype.GetName();
-                                                                else
-                                                                {
-                                                                    Subtype thisSubtype = subtypesList.Where(x => x.GetCode().ToString() == dictValue).FirstOrDefault();
-                                                                    domainDescription = thisSubtype.GetName();
-                                                                }
-                                                            }
-                                                            else
-                                                            {
-                                                                Domain domain = field.GetDomain(subtype);
-                                                                if (domain != null)
-                                                                {
-                                                                    if (domain is CodedValueDomain codedValueDomain)
-                                                                    {
-                                                                        if (pair.Value != null)
-                                                                        {
-                                                                            if (!string.IsNullOrEmpty(pair.Value.ToString()))
-                                                                                domainDescription = Common.GetCodedValueDomainValue(codedValueDomain, dictValue);
-                                                                        }
-                                                                    }
-
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-
-                                                    //Write out properties of the edit template
-                                                    CSVLayout templateRec = new CSVLayout()
-                                                    {
-                                                        LayerPos = layerPos.ToString(),
-                                                        LayerType = layerType,
-                                                        LayerName = Common.EncloseStringInDoubleQuotes(layer.Name),
-                                                        GroupLayerName = groupLayerName,
-                                                        TemplateName = Common.EncloseStringInDoubleQuotes(template.Name),
-                                                        FieldName = pair.Key,
-                                                        DefaultValue = dictValue,
-                                                        DomainDescription = domainDescription,
-                                                        CIMPath = layer.URI
-                                                    };
-                                                    csvLayoutList.Add(templateRec);
-
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            //
                         }
+                        
+                        //Basic FeatureLayer
+                        if (mapMember is BasicFeatureLayer basicFeatureLayer) 
+                        {
+                            InterrogateFeatureLayer(basicFeatureLayer, layerPos, groupLayerName, layerType, DataSourceInMapList, ref gpiList, ref csvLayoutList);
+                        }
+
+                        //Group Layer
+                        else if (mapMember is GroupLayer groupLayer)
+                        {
+                            CSVLayout templateRec = new CSVLayout()
+                            {
+                                LayerPos = layerPos.ToString(),
+                                LayerType = layerType,
+                                GroupLayerName = groupLayerName
+                            };
+
+                            csvLayoutList.Add(templateRec);
+                        }
+
+                        //Subtype Group Layer
+                        else if (mapMember is SubtypeGroupLayer subtypeGroupLayer)
+                        {
+                            CSVLayout templateRec = new CSVLayout()
+                            {
+                                LayerPos = layerPos.ToString(),
+                                LayerType = layerType,
+                                GroupLayerName = groupLayerName
+                            };
+
+                            csvLayoutList.Add(templateRec);
+                        }
+                        
                         //Subtype Group Table
                         else if (mapMember is SubtypeGroupTable subtypeGroupTable)
                         {
-                           
                             //Include "sub tables" in the report 
                             IReadOnlyList<StandaloneTable> standaloneTablesList = subtypeGroupTable.StandaloneTables;
                             TableDefinition tableDefinition = getTableDefinitionOfMapMember(DataSourceInMapList, standaloneTablesList.FirstOrDefault());
@@ -257,10 +158,7 @@ namespace UtilityNetworkPropertiesExtractor
                             IReadOnlyList<Subtype> subtypesList = tableDefinition.GetSubtypes();
 
                             foreach (StandaloneTable standaloneTable in standaloneTablesList)
-                            {
-                                
                                 layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, tableDefinition, fieldsList, subtypesList, ref csvLayoutList);
-                            }
                         }
 
                         //Standalone Table
@@ -269,7 +167,7 @@ namespace UtilityNetworkPropertiesExtractor
                             TableDefinition tableDefinition = getTableDefinitionOfMapMember(DataSourceInMapList, standaloneTable);
                             IReadOnlyList<Field> fieldsList = tableDefinition.GetFields();
                             IReadOnlyList<Subtype> subtypesList = tableDefinition.GetSubtypes();
-                            
+
                             layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
                             layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, tableDefinition, fieldsList, subtypesList, ref csvLayoutList);
                         }
@@ -277,7 +175,7 @@ namespace UtilityNetworkPropertiesExtractor
                         layerPos += 1;
                     }
 
-                    //Write body of report
+                    //Write group and present templates to csv
                     string gpiColumnHeader = Common.ExtractClassPropertyNamesToString(gpiProperties);
                     sw.WriteLine(gpiColumnHeader);
 
@@ -289,6 +187,7 @@ namespace UtilityNetworkPropertiesExtractor
 
                     sw.WriteLine("");
 
+                    //Write edit templates to csv
                     string columnHeader = Common.ExtractClassPropertyNamesToString(properties);
                     sw.WriteLine(columnHeader);
 
@@ -302,6 +201,156 @@ namespace UtilityNetworkPropertiesExtractor
                     sw.Close();
                 }
             });
+        }
+
+        private static void InterrogateFeatureLayer(BasicFeatureLayer basicFeatureLayer, int layerPos, string groupLayerName, string layerType, List<DataSourceInMap> DataSourceInMapList, ref List<GroupAndPresetInfo> gpiList,  ref List<CSVLayout> csvLayoutList)
+        {
+            //Determine if layer has any edit templates
+            CIMFeatureLayer layerDef = basicFeatureLayer.GetDefinition() as CIMFeatureLayer;
+            if (layerDef != null)
+            {
+                List<CIMEditingTemplate> editingTemplateList = layerDef.FeatureTemplates?.ToList();
+                if (editingTemplateList.Count > 0)
+                {
+                    FeatureClassDefinition fcDefinition = getFeatureClassDefinitionOfMapMember(DataSourceInMapList, basicFeatureLayer);
+                    if (fcDefinition == null)
+                        return;
+
+                    FeatureLayer featureLayer = basicFeatureLayer as FeatureLayer;
+                    IReadOnlyList<Field> fieldsList = fcDefinition.GetFields();
+                    IReadOnlyList<Subtype> subtypesList = fcDefinition.GetSubtypes();
+
+                    Subtype subtype = null;
+                    if (featureLayer.IsSubtypeLayer && subtypesList.Count != 0)
+                        subtype = subtypesList.Where(x => x.GetCode() == featureLayer.SubtypeValue).FirstOrDefault();
+
+                    foreach (CIMEditingTemplate editingTemplate in editingTemplateList)
+                    {
+                        //Group or Preset templates
+                        if (editingTemplate is CIMGroupEditingTemplate cimGroupEditingTemplate)
+                        {
+                            //Add basepart (if exists)
+                            CIMGroupEditingTemplatePart basePart = cimGroupEditingTemplate.BasePart;
+                            if (basePart != null)
+                            {
+                                if (! string.IsNullOrEmpty(basePart.LayerURI))
+                                {
+                                    GroupAndPresetInfo gpi = new GroupAndPresetInfo()
+                                    {
+                                        LayerPos = layerPos.ToString(),
+                                        LayerType = layerType,
+                                        GroupLayerName = groupLayerName,
+                                        LayerName = Common.EncloseStringInDoubleQuotes(basicFeatureLayer.Name),
+                                        GroupOrPresetName = Common.EncloseStringInDoubleQuotes(cimGroupEditingTemplate.Name),
+                                        FeaturesOrBuilders = basePart.LayerURI
+                                    };
+
+                                    gpiList.Add(gpi);
+                                }
+                            }
+
+                            //Add the componets to the group/preset template.
+                            string featuresURI = string.Empty;
+                            foreach (CIMGroupEditingTemplatePart cimGroupEditingTemplatePart in cimGroupEditingTemplate.Parts)
+                            {
+                                if (cimGroupEditingTemplatePart.TransformationID == "esri_editing_un_association_builder")
+                                    featuresURI = "UN Association Builder";
+                                else
+                                    featuresURI = cimGroupEditingTemplatePart.LayerURI;
+
+                                GroupAndPresetInfo gpi = new GroupAndPresetInfo()
+                                {
+                                    LayerPos = layerPos.ToString(),
+                                    LayerType = layerType,
+                                    GroupLayerName = groupLayerName,
+                                    LayerName = Common.EncloseStringInDoubleQuotes(basicFeatureLayer.Name),
+                                    GroupOrPresetName = Common.EncloseStringInDoubleQuotes(cimGroupEditingTemplate.Name),
+                                    FeaturesOrBuilders = featuresURI
+                                };
+
+                                gpiList.Add(gpi);
+                            }
+                        }
+
+                        //Edit templates
+                        else if (editingTemplate is CIMRowTemplate cimRowTemplate)
+                        {
+                            if (cimRowTemplate.Tags != "Hidden")
+                            {
+                                string dictValue = string.Empty;
+                                string domainName = string.Empty;
+                                string domainDescription = string.Empty;
+
+                                IDictionary<string, object> templateDict = cimRowTemplate.DefaultValues;
+                                foreach (KeyValuePair<string, object> pair in templateDict)
+                                {
+                                    domainDescription = string.Empty;
+                                    domainName = string.Empty;
+
+                                    if (pair.Value == null)
+                                        dictValue = string.Empty;
+                                    else
+                                    {
+                                        dictValue = pair.Value.ToString();
+
+                                        //now check if the field has a domain value
+                                        Field field = fieldsList.Where(x => x.Name.ToLower() == pair.Key.ToLower()).FirstOrDefault();
+                                        if (field != null)
+                                        {
+                                            if (field.Name.ToLower() == fcDefinition.GetSubtypeField().ToLower())
+                                            {
+                                                domainName = _subtypeFieldText;
+
+                                                if (featureLayer.IsSubtypeLayer)
+                                                    domainDescription = subtype.GetName();
+                                                else
+                                                {
+                                                    Subtype thisSubtype = subtypesList.Where(x => x.GetCode().ToString() == dictValue).FirstOrDefault();
+                                                    domainDescription = thisSubtype.GetName();
+                                                }
+                                            }
+                                            else
+                                            {
+                                                Domain domain = field.GetDomain(subtype);
+                                                if (domain != null)
+                                                {
+                                                    if (domain is CodedValueDomain codedValueDomain)
+                                                    {
+                                                        if (pair.Value != null)
+                                                        {
+                                                            if (!string.IsNullOrEmpty(pair.Value.ToString()))
+                                                            {
+                                                                domainDescription = Common.GetCodedValueDomainValue(codedValueDomain, dictValue);
+                                                                domainName = domain.GetName();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    //Write out properties of the edit template
+                                    CSVLayout templateRec = new CSVLayout()
+                                    {
+                                        LayerPos = layerPos.ToString(),
+                                        LayerType = layerType,
+                                        LayerName = Common.EncloseStringInDoubleQuotes(basicFeatureLayer.Name),
+                                        GroupLayerName = groupLayerName,
+                                        TemplateName = Common.EncloseStringInDoubleQuotes(editingTemplate.Name),
+                                        FieldName = pair.Key,
+                                        DefaultValue = dictValue,
+                                        DomainDescription = domainDescription,
+                                        DomainName = domainName,
+                                        CIMPath = basicFeatureLayer.URI
+                                    };
+                                    csvLayoutList.Add(templateRec);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, TableDefinition tableDefinition, IReadOnlyList<Field> fieldsList, IReadOnlyList<Subtype> subtypesList,  ref List<CSVLayout> csvLayoutList)
@@ -328,20 +377,24 @@ namespace UtilityNetworkPropertiesExtractor
             //Get CIM defintion for standalone table
             CIMStandaloneTable cimStandaloneTableDef = standaloneTable.GetDefinition();
             
-            IList<CIMEditingTemplate> cimEditingTemplates = cimStandaloneTableDef.RowTemplates;
-            if (cimEditingTemplates != null)
+            IList<CIMEditingTemplate> cimEditingTemplateList = cimStandaloneTableDef.RowTemplates;
+            if (cimEditingTemplateList != null)
             {
-                foreach (CIMEditingTemplate template in cimEditingTemplates)
+                foreach (CIMEditingTemplate editingTemplate in cimEditingTemplateList)
                 {
-                    CIMRowTemplate rowTemplate = template as CIMRowTemplate;
+                    CIMRowTemplate rowTemplate = editingTemplate as CIMRowTemplate;
                     if (rowTemplate != null)
                     {
                         string dictValue = string.Empty;
+                        string domainName = string.Empty;
+                        string domainDescription = string.Empty;
 
                         IDictionary<string, object> templateDict = rowTemplate.DefaultValues;
                         foreach (KeyValuePair<string, object> pair in templateDict)
                         {
-                            string domainDescription = string.Empty;
+                            domainDescription = string.Empty;
+                            domainName = string.Empty;
+
                             if (pair.Value == null)
                                 dictValue = string.Empty;
                             else
@@ -352,8 +405,10 @@ namespace UtilityNetworkPropertiesExtractor
                                 Field field = fieldsList.Where(x => x.Name.ToLower() == pair.Key.ToLower()).FirstOrDefault();
                                 if (field != null)
                                 {
-
                                     if (field.Name.ToLower() == tableDefinition.GetSubtypeField().ToLower())
+                                    {
+                                        domainName = _subtypeFieldText;
+
                                         if (standaloneTable.IsSubtypeTable)
                                             domainDescription = subtype.GetName();
                                         else
@@ -361,6 +416,7 @@ namespace UtilityNetworkPropertiesExtractor
                                             Subtype thisSubtype = subtypesList.Where(x => x.GetCode().ToString() == dictValue).FirstOrDefault();
                                             domainDescription = thisSubtype.GetName();
                                         }
+                                    }
                                     else
                                     {
                                         Domain domain = field.GetDomain(subtype);
@@ -371,20 +427,22 @@ namespace UtilityNetworkPropertiesExtractor
                                                 if (pair.Value != null)
                                                 {
                                                     if (!string.IsNullOrEmpty(pair.Value.ToString()))
+                                                    {
                                                         domainDescription = Common.GetCodedValueDomainValue(codedValueDomain, dictValue);
+                                                        domainName = domain.GetName();
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-
-                            csvLayout.TemplateName = template.Name;
+                            csvLayout.TemplateName = editingTemplate.Name;
                             csvLayout.FieldName = pair.Key;
                             csvLayout.DefaultValue = dictValue;
-                            csvLayout.DomainDescription = domainDescription;  
+                            csvLayout.DomainDescription = domainDescription;
+                            csvLayout.DomainName = domainName;
                             csvLayout.CIMPath = standaloneTable.URI;
-
                             csvLayoutList.Add(csvLayout);
                         }
                     }
@@ -406,9 +464,7 @@ namespace UtilityNetworkPropertiesExtractor
                 {
                     fcDefinition = fcDefinitions.Where(x => x.GetName() == featureLayer.GetFeatureClass().GetName()).FirstOrDefault();
                     if (fcDefinition != null)
-                    {
                         return fcDefinition;
-                    }
                 }
             }
             return null;
@@ -433,8 +489,6 @@ namespace UtilityNetworkPropertiesExtractor
             return null;
         }
 
-
-
         private class GroupAndPresetInfo
         {
             public string GroupAndPresets { get; set; }
@@ -443,7 +497,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string GroupLayerName { get; set; }
             public string LayerName { get; set; }
             public string GroupOrPresetName { get; set; }
-            public string Parts { get; set; }
+            public string FeaturesOrBuilders { get; set; }
         }
 
         private class CSVLayout
@@ -457,6 +511,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string FieldName { get; set; }
             public string DefaultValue { get; set; }
             public string DomainDescription { get; set; }
+            public string DomainName { get; set; }
             public string CIMPath { get; set; }
         }
     }

@@ -35,6 +35,7 @@ namespace UtilityNetworkPropertiesExtractor
                 await SymbolScalesButton.ExtractSymbolScalesAsync();
                 await PopupFieldsButton.ExtractPopupFieldsAsync();
                 await FieldSettingsInMapButton.ExtractFieldSettingsInMapAsync();
+                await EditTemplatesButton.EditTemplateMasterAsync();
 
                 //Utility Network specific reports
                 await UNFeatureServiceInfoButton.ExtractUNFeatureServiceInfo(false);
