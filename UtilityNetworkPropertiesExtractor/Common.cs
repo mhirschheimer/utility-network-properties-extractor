@@ -94,6 +94,7 @@ namespace UtilityNetworkPropertiesExtractor
 
             return retVal;
         }
+               
 
         public static int GetCountOfTablesInGroupLayers()
         {

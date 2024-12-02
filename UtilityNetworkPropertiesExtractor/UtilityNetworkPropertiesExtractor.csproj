@@ -134,6 +134,7 @@
     <Compile Include="AttributeRulesButton.cs" />
     <Compile Include="Common.cs" />
     <Compile Include="ContingentValuesButton.cs" />
+    <Compile Include="EditTemplatesButton.cs" />
     <Compile Include="ExportSubnetworkResultFieldsButton.cs" />
     <Compile Include="ExtractLocationButton.cs" />
     <Compile Include="Helpers\DataSourcesInMapHelper.cs" />
