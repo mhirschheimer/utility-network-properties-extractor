@@ -56,38 +56,38 @@ namespace UtilityNetworkPropertiesExtractor
 
             return QueuedTask.Run(() =>
             {
-            string outputFile = Common.BuildCsvNameContainingMapName("EditTemplates");
-            using (StreamWriter sw = new StreamWriter(outputFile))
-            {
-                //Header information
-                Common.WriteHeaderInfoForMap(sw, "Edit Templates");
-                sw.WriteLine("Layers," + MapView.Active.Map.GetLayersAsFlattenedList().OfType<Layer>().Count());
-                sw.WriteLine("Standalone Tables," + Common.GetCountOfAllTablesInMap());
-                sw.WriteLine();
-
-                //Get all properties defined in the class.  This will be used to generate the CSV file
-                GroupAndPresetInfo emptyGPI = new GroupAndPresetInfo();
-                PropertyInfo[] gpiProperties = Common.GetPropertiesOfClass(emptyGPI);
-                List<GroupAndPresetInfo> gpiList = new List<GroupAndPresetInfo>();
-
-                //Get all properties defined in the class.  This will be used to generate the CSV file
-                CSVLayout emptyRec = new CSVLayout();
-                PropertyInfo[] properties = Common.GetPropertiesOfClass(emptyRec);
-                List<CSVLayout> csvLayoutList = new List<CSVLayout>();
-
-                int layerPos = 1;
-                string groupLayerName = string.Empty;
-                string prevGroupLayerName = string.Empty;
-                string layerContainer = string.Empty;
-                string layerType = string.Empty;
-
-                //Get datasouces in map.  This will be used to get domain descriptions on defaulted values (if applicable)
-                List<DataSourceInMap> DataSourceInMapList = DataSourcesInMapHelper.GetDataSourcesInMap();
-
-                //Get list of all layers in the map
-                IReadOnlyList<MapMember> mapMemberList = MapView.Active.Map.GetMapMembersAsFlattenedList();
-                foreach (MapMember mapMember in mapMemberList)
+                string outputFile = Common.BuildCsvNameContainingMapName("EditTemplates");
+                using (StreamWriter sw = new StreamWriter(outputFile))
                 {
+                    //Header information
+                    Common.WriteHeaderInfoForMap(sw, "Edit Templates");
+                    sw.WriteLine("Layers," + MapView.Active.Map.GetLayersAsFlattenedList().OfType<Layer>().Count());
+                    sw.WriteLine("Standalone Tables," + Common.GetCountOfAllTablesInMap());
+                    sw.WriteLine();
+
+                    //Get all properties defined in the class.  This will be used to generate the CSV file
+                    GroupAndPresetInfo emptyGPI = new GroupAndPresetInfo();
+                    PropertyInfo[] gpiProperties = Common.GetPropertiesOfClass(emptyGPI);
+                    List<GroupAndPresetInfo> gpiList = new List<GroupAndPresetInfo>();
+
+                    //Get all properties defined in the class.  This will be used to generate the CSV file
+                    CSVLayout emptyRec = new CSVLayout();
+                    PropertyInfo[] properties = Common.GetPropertiesOfClass(emptyRec);
+                    List<CSVLayout> csvLayoutList = new List<CSVLayout>();
+
+                    int layerPos = 1;
+                    string groupLayerName = string.Empty;
+                    string prevGroupLayerName = string.Empty;
+                    string layerContainer = string.Empty;
+                    string layerType = string.Empty;
+
+                    //Get datasouces in map.  This will be used to get domain descriptions on defaulted values (if applicable)
+                    List<DataSourceInMap> DataSourceInMapList = DataSourcesInMapHelper.GetDataSourcesInMap();
+
+                    //Get list of all layers in the map
+                    IReadOnlyList<MapMember> mapMemberList = MapView.Active.Map.GetMapMembersAsFlattenedList();
+                    foreach (MapMember mapMember in mapMemberList)
+                    {
                         //Determine generic layer information
                         if (mapMember is Layer layer)
                         {
@@ -115,9 +115,9 @@ namespace UtilityNetworkPropertiesExtractor
                                     break;
                             }
                         }
-                        
+
                         //Basic FeatureLayer
-                        if (mapMember is BasicFeatureLayer basicFeatureLayer) 
+                        if (mapMember is BasicFeatureLayer basicFeatureLayer)
                         {
                             InterrogateFeatureLayer(basicFeatureLayer, layerPos, groupLayerName, layerType, DataSourceInMapList, ref gpiList, ref csvLayoutList);
                         }
@@ -147,10 +147,20 @@ namespace UtilityNetworkPropertiesExtractor
 
                             csvLayoutList.Add(templateRec);
                         }
-                        
+
                         //Subtype Group Table
                         else if (mapMember is SubtypeGroupTable subtypeGroupTable)
                         {
+                            CSVLayout templateRec = new CSVLayout()
+                            {
+                                LayerPos = layerPos.ToString(),
+                                LayerType = "Subtype Group Table",
+                                GroupLayerName = subtypeGroupTable.Name
+                            };
+
+                            csvLayoutList.Add(templateRec);
+                            layerPos += 1;
+
                             //Include "sub tables" in the report 
                             IReadOnlyList<StandaloneTable> standaloneTablesList = subtypeGroupTable.StandaloneTables;
                             TableDefinition tableDefinition = getTableDefinitionOfMapMember(DataSourceInMapList, standaloneTablesList.FirstOrDefault());
@@ -171,7 +181,7 @@ namespace UtilityNetworkPropertiesExtractor
                             layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
                             layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, tableDefinition, fieldsList, subtypesList, ref csvLayoutList);
                         }
-                        
+
                         layerPos += 1;
                     }
 
@@ -355,21 +365,6 @@ namespace UtilityNetworkPropertiesExtractor
 
         private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, TableDefinition tableDefinition, IReadOnlyList<Field> fieldsList, IReadOnlyList<Subtype> subtypesList,  ref List<CSVLayout> csvLayoutList)
         {
-            CSVLayout csvLayout = new CSVLayout()
-            {
-                GroupLayerName = Common.EncloseStringInDoubleQuotes(groupLayerName),
-                LayerName = Common.EncloseStringInDoubleQuotes(standaloneTable.Name),
-                LayerPos = layerPos.ToString(),
-                LayerType = Common.GetLayerTypeDescription(standaloneTable)
-            };
-
-            //Subtype Group Table entry
-            if (standaloneTable is SubtypeGroupTable)
-            {
-                csvLayout.GroupLayerName = Common.EncloseStringInDoubleQuotes(standaloneTable.Name);
-                csvLayout.LayerName = string.Empty;
-            }
-
             Subtype subtype = null;
             if (standaloneTable.IsSubtypeTable && subtypesList.Count != 0)
                 subtype = subtypesList.Where(x => x.GetCode() == standaloneTable.SubtypeValue).FirstOrDefault();
@@ -394,7 +389,7 @@ namespace UtilityNetworkPropertiesExtractor
                         {
                             domainDescription = string.Empty;
                             domainName = string.Empty;
-
+                            
                             if (pair.Value == null)
                                 dictValue = string.Empty;
                             else
@@ -437,13 +432,37 @@ namespace UtilityNetworkPropertiesExtractor
                                     }
                                 }
                             }
-                            csvLayout.TemplateName = editingTemplate.Name;
-                            csvLayout.FieldName = pair.Key;
-                            csvLayout.DefaultValue = dictValue;
-                            csvLayout.DomainDescription = domainDescription;
-                            csvLayout.DomainName = domainName;
-                            csvLayout.CIMPath = standaloneTable.URI;
-                            csvLayoutList.Add(csvLayout);
+                            //csvLayout.TemplateName = editingTemplate.Name;
+                            //csvLayout.FieldName = pair.Key;
+                            //csvLayout.DefaultValue = dictValue;
+                            //csvLayout.DomainDescription = domainDescription;
+                            //csvLayout.DomainName = domainName;
+                            //csvLayout.CIMPath = standaloneTable.URI;
+                            //csvLayoutList.Add(csvLayout);
+
+                            //CSVLayout csvLayout = new CSVLayout()
+                            //{
+                            //    GroupLayerName = Common.EncloseStringInDoubleQuotes(groupLayerName),
+                            //    LayerName = Common.EncloseStringInDoubleQuotes(standaloneTable.Name),
+                            //    LayerPos = layerPos.ToString(),
+                            //    LayerType = Common.GetLayerTypeDescription(standaloneTable)
+                            //};
+
+                            //Write out properties of the edit template
+                            CSVLayout templateRec = new CSVLayout()
+                            {
+                                LayerPos = layerPos.ToString(),
+                                LayerType = Common.GetLayerTypeDescription(standaloneTable),
+                                LayerName = Common.EncloseStringInDoubleQuotes(standaloneTable.Name),
+                                GroupLayerName = groupLayerName,
+                                TemplateName = Common.EncloseStringInDoubleQuotes(editingTemplate.Name),
+                                FieldName = pair.Key,
+                                DefaultValue = dictValue,
+                                DomainDescription = domainDescription,
+                                DomainName = domainName,
+                                CIMPath = standaloneTable.URI
+                            };
+                            csvLayoutList.Add(templateRec);
                         }
                     }
                 }
@@ -491,7 +510,7 @@ namespace UtilityNetworkPropertiesExtractor
 
         private class GroupAndPresetInfo
         {
-            public string GroupAndPresets { get; set; }
+            public string GroupAndPresetTemplates { get; set; }
             public string LayerPos { get; set; }
             public string LayerType { get; set; }
             public string GroupLayerName { get; set; }
