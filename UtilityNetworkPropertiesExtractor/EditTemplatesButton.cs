@@ -185,6 +185,19 @@ namespace UtilityNetworkPropertiesExtractor
                         layerPos += 1;
                     }
 
+
+
+                    //Write section of Distinct group and preset templates
+                    IEnumerable<GroupAndPresetInfo> distinctTemplates = gpiList.GroupBy(m => new { m.GroupOrPresetName }).Select(m => m.FirstOrDefault()).OrderBy(m => m.GroupOrPresetName).ToList();
+                    if (distinctTemplates.Any())
+                    {
+                        sw.WriteLine("DistinctGroupAndPresetTemplates");
+                        foreach (GroupAndPresetInfo distinctName in distinctTemplates)
+                            sw.WriteLine("," + distinctName.GroupOrPresetName);
+
+                        sw.WriteLine("");
+                    }
+
                     //Write group and present templates to csv
                     string gpiColumnHeader = Common.ExtractClassPropertyNamesToString(gpiProperties);
                     sw.WriteLine(gpiColumnHeader);
@@ -504,7 +517,7 @@ namespace UtilityNetworkPropertiesExtractor
 
         private class GroupAndPresetInfo
         {
-            public string GroupAndPresetTemplates { get; set; }
+            public string GroupAndPresetParts { get; set; }
             public string LayerPos { get; set; }
             public string LayerType { get; set; }
             public string GroupLayerName { get; set; }
