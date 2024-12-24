@@ -109,7 +109,7 @@ namespace UtilityNetworkPropertiesExtractor
                 foreach (FileInfo bf in blankFiles)
                 {
                     string[] lines = File.ReadAllLines(bf.FullName);
-                    int cnt = lines.Count();
+                    int cnt = lines.Length;
 
                     if (cnt == 1)
                         bf.Delete();
