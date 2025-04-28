@@ -333,7 +333,8 @@ namespace UtilityNetworkPropertiesExtractor
                                                         else
                                                         {
                                                             Subtype thisSubtype = subtypesList.Where(x => x.GetCode().ToString() == dictValue).FirstOrDefault();
-                                                            domainDescription = thisSubtype.GetName();
+                                                            if (thisSubtype != null)
+                                                                domainDescription = thisSubtype.GetName();
                                                         }
                                                     }
                                                     else
@@ -430,7 +431,8 @@ namespace UtilityNetworkPropertiesExtractor
                                             else
                                             {
                                                 Subtype thisSubtype = subtypesList.Where(x => x.GetCode().ToString() == dictValue).FirstOrDefault();
-                                                domainDescription = thisSubtype.GetName();
+                                                if (thisSubtype != null)
+                                                    domainDescription = thisSubtype.GetName();
                                             }
                                         }
                                         else
