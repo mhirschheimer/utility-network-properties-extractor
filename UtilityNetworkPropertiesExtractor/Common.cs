@@ -170,6 +170,12 @@ namespace UtilityNetworkPropertiesExtractor
                     retVal = "Image Service Layer";
                 else if (layer.MapLayerType == MapLayerType.BasemapBackground)
                     retVal = "Basemap";
+                else
+                {
+                    var def = layer.GetDefinition() as CIMBaseLayer;
+                    if (def is CIMGeodatabaseErrorLayer)
+                        retVal = "Geodatabase Validation Error Tables";
+                }
             }
             else // Tables
             {

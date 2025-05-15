@@ -96,7 +96,6 @@ namespace UtilityNetworkPropertiesExtractor
                 }
             });
         }
-
         private static void InterrogateLayers(ref List<CSVLayout> csvLayoutList, ref List<PopupLayout> popupLayoutList, ref List<DisplayFilterLayout> displayFilterLayoutList, ref List<SharedTraceConfigurationLayout> sharedTraceConfigurationLayout, ref List<DefinitionQueryLayout> definitionQueryLayout, ref List<LabelLayout> labelLayoutList)
         {
             int displayFilterCount;
@@ -139,7 +138,7 @@ namespace UtilityNetworkPropertiesExtractor
                         }
                         else
                             layerContainer = string.Empty;
-
+                                               
                         csvLayout.IsExpanded = layer.IsExpanded.ToString();
                         csvLayout.IsVisible = layer.IsVisible.ToString();
                         csvLayout.MaxScale = Common.GetScaleValueText(layer.MaxScale);
@@ -150,6 +149,18 @@ namespace UtilityNetworkPropertiesExtractor
                     csvLayout.LayerType = Common.GetLayerTypeDescription(mapMember);
                     csvLayout.LayerName = Common.EncloseStringInDoubleQuotes(mapMember.Name);
                     csvLayout.GroupLayerName = Common.EncloseStringInDoubleQuotes(layerContainer);
+
+                    //Geodatabase Error Layer"
+                    if (mapMember is Layer lyr)
+                    {
+                        //If layer is the "Geodatabase Error Layer", use the layer name as the group layer name
+                        var def = lyr.GetDefinition() as CIMBaseLayer;
+                        if (def is CIMGeodatabaseErrorLayer)
+                        {
+                            csvLayout.GroupLayerName = Common.EncloseStringInDoubleQuotes(mapMember.Name);
+                            csvLayout.LayerName = string.Empty;
+                        }
+                    }
 
                     //BasicFeatureLayer (Layers that inherit from BasicFeatureLayer are FeatureLayer, AnnotationLayer and DimensionLayer)
                     if (mapMember is BasicFeatureLayer basicFeatureLayer)
@@ -275,7 +286,7 @@ namespace UtilityNetworkPropertiesExtractor
                     {
                         csvLayout.GroupLayerName = csvLayout.LayerName;
                         csvLayout.LayerName = string.Empty;
-                       
+
                         CIMSubtypeGroupLayer cimSubtypeGroupLayer = subtypeGroupLayer.GetDefinition() as CIMSubtypeGroupLayer;
                         if (cimSubtypeGroupLayer.EnableDisplayFilters)
                         {
@@ -347,7 +358,7 @@ namespace UtilityNetworkPropertiesExtractor
                     {
                         layerContainer = Common.GetGroupLayerNameForStandaloneTable(subtypeGroupTable);
                         layerPos = InterrogateStandaloneTable(subtypeGroupTable, layerPos, layerContainer, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
-                        
+
                         //Include "sub tables" in the report 
                         IReadOnlyList<StandaloneTable> standaloneTablesList = subtypeGroupTable.StandaloneTables;
                         foreach (StandaloneTable standaloneTable in standaloneTablesList)
