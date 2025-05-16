@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Reflection;
 
 namespace UtilityNetworkPropertiesExtractor
@@ -53,6 +54,23 @@ namespace UtilityNetworkPropertiesExtractor
             return string.Format("{0}:{1}:{2}", traceTime.Hours, traceTime.Minutes, traceTime.Seconds);
         }
 
+        private static bool DoesGeodatabaseErrorLayerExistInMap()
+        {
+            bool retVal = false;
+            IReadOnlyList<Layer> layerList = MapView.Active.Map.GetMapMembersAsFlattenedList().OfType<Layer>().ToList();
+            foreach (Layer lyr in layerList)
+            {
+                var def = lyr.GetDefinition() as CIMBaseLayer;
+                if (def is CIMGeodatabaseErrorLayer)
+                {
+                    retVal = true;
+                    break;
+                }
+            }
+
+            return retVal;
+        }
+        
         public static string ExtractClassValuesToString<T>(T rec, PropertyInfo[] properties)
         {
             return properties.Select(n => n.GetValue(rec, null)).Select(n => n == null ? string.Empty : n.ToString()).Aggregate((a, b) => a + Delimiter + b);
@@ -117,6 +135,10 @@ namespace UtilityNetworkPropertiesExtractor
 
             //Standalone tables section in the TOC
             cnt += GetCountOfTables(MapView.Active.Map.StandaloneTables);
+
+            //Check if "Geodatabase Validation Error Tables" exists in map
+            if (DoesGeodatabaseErrorLayerExistInMap())
+                cnt += 1;
 
             return cnt;
         }
