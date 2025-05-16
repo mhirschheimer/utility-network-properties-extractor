@@ -311,8 +311,21 @@ namespace UtilityNetworkPropertiesExtractor
                     {
                         csvLayout.GroupLayerName = csvLayout.LayerName;
                         csvLayout.LayerName = string.Empty;
-                    }
 
+                        //Determine group type using the words used in the Pro UI
+                        switch (groupLayer.SublayerVisibilityMode)
+                        {
+                            case SublayerVisibilityMode.Exclusive:
+                                csvLayout.GroupType = "Radio";
+                                break;
+                            case SublayerVisibilityMode.Independent:
+                                csvLayout.GroupType = "Checkbox";
+                                break;
+                            default:
+                                csvLayout.GroupType = "Checkbox";
+                                break;
+                        }
+                    }
                     //Utiliy Network Layer
                     else if (mapMember is UtilityNetworkLayer utilityNetworkLayer)
                     {
@@ -925,6 +938,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string ClassName { get; set; }
             public string IsSubtypeLayer { get; set; }
             public string SubtypeValue { get; set; }
+            public string GroupType { get; set; }
             public string GeometryType { get; set; }
             public string IsSnappable { get; set; }
             public string IsSelectable { get; set; }
