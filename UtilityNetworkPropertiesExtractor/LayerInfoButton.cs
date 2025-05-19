@@ -726,6 +726,7 @@ namespace UtilityNetworkPropertiesExtractor
 
             if (definitionQuery.Count > 0)
             {
+                string whereClause;
                 bool activeDefQuery;
                 foreach (DefinitionQuery filter in definitionQuery)
                 {
@@ -739,14 +740,21 @@ namespace UtilityNetworkPropertiesExtractor
                             activeDefQuery = false;
                     }
 
+                    // Spatial Clause added at Pro 3.5
+                    if (filter.SpatialReference != null)
+                        whereClause = "Spatial Clause";
+                    else
+                        whereClause = filter.WhereClause;
+
                     DefinitionQueryLayout definitionQueryLayout = new DefinitionQueryLayout()
                     {
                         LayerPos = csvLayout.LayerPos,
                         LayerType = csvLayout.LayerType,
                         GroupLayerName = csvLayout.GroupLayerName,
                         LayerName = csvLayout.LayerName,
-                        DefinitionQueryName = filter.Name,
-                        DefinitionQuery = Common.EncloseStringInDoubleQuotes(filter.Name),
+                        DefinitionQueryName = Common.EncloseStringInDoubleQuotes(filter.Name),
+                        DefinitionQuery = Common.EncloseStringInDoubleQuotes(whereClause),
+                        IsValid = filter.IsValid,
                         Active = activeDefQuery.ToString()
                     };
 
@@ -993,6 +1001,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string Active { get; set; }
             public string DefinitionQueryName { get; set; }
             public string DefinitionQuery { get; set; }
+            public bool IsValid { get; set; }
         }
 
         private class DisplayFilterLayout
