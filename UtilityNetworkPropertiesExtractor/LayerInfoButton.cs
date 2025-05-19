@@ -165,7 +165,7 @@ namespace UtilityNetworkPropertiesExtractor
                     //BasicFeatureLayer (Layers that inherit from BasicFeatureLayer are FeatureLayer, AnnotationLayer and DimensionLayer)
                     if (mapMember is BasicFeatureLayer basicFeatureLayer)
                     {
-                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(basicFeatureLayer.DefinitionQuery);
+                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(basicFeatureLayer.ActiveDefinitionQuery?.WhereClause);
                         csvLayout.ClassName = basicFeatureLayer.GetTable().GetName();
                         csvLayout.GeometryType = basicFeatureLayer.ShapeType.ToString();
                         csvLayout.IsEditable = basicFeatureLayer.IsEditable.ToString();
@@ -230,7 +230,7 @@ namespace UtilityNetworkPropertiesExtractor
 
                             //Definition Queries
                             if (!featureLayer.IsSubtypeLayer)
-                                additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, featureLayer.DefinitionQueries, featureLayer.DefinitionQuery, ref definitionQueryLayout);
+                                additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, featureLayer.DefinitionQueries, featureLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
                             else
                             {
                                 //When the featurelayer is part of a subtype group layer, the definition query can only be set at the SGL level
@@ -267,7 +267,7 @@ namespace UtilityNetworkPropertiesExtractor
                         else if (basicFeatureLayer is AnnotationLayer annotationLayer)
                         {
                             //Definition Queries
-                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, annotationLayer.DefinitionQueries, annotationLayer.DefinitionQuery, ref definitionQueryLayout);
+                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, annotationLayer.DefinitionQueries, annotationLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
                             csvLayout.GroupLayerName = csvLayout.LayerName;
                             csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
                         }
@@ -276,7 +276,7 @@ namespace UtilityNetworkPropertiesExtractor
                         else if (basicFeatureLayer is DimensionLayer dimensionLayer)
                         {
                             //Definition Queries
-                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, dimensionLayer.DefinitionQueries, dimensionLayer.DefinitionQuery, ref definitionQueryLayout);
+                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, dimensionLayer.DefinitionQueries, dimensionLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
                             csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
                         }
                     }
@@ -297,9 +297,9 @@ namespace UtilityNetworkPropertiesExtractor
                         }
 
                         //Definition Queries
-                        additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, subtypeGroupLayer.DefinitionQueries, subtypeGroupLayer.DefinitionQuery, ref definitionQueryLayout);
+                        additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, subtypeGroupLayer.DefinitionQueries, subtypeGroupLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
 
-                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(subtypeGroupLayer.DefinitionQuery);
+                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(subtypeGroupLayer.ActiveDefinitionQuery?.WhereClause);
                         csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
                         csvLayout.DisplayFilterCount = displayFilterCount.ToString();
                         csvLayout.DisplayFilterExpresssion = displayFilterExpression;
@@ -370,12 +370,12 @@ namespace UtilityNetworkPropertiesExtractor
                     else if (mapMember is SubtypeGroupTable subtypeGroupTable)
                     {
                         layerContainer = Common.GetGroupLayerNameForStandaloneTable(subtypeGroupTable);
-                        layerPos = InterrogateStandaloneTable(subtypeGroupTable, layerPos, layerContainer, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
+                        layerPos = InterrogateStandaloneTable(subtypeGroupTable, layerPos, layerContainer, subtypeGroupTable.ActiveDefinitionQuery?.WhereClause,  ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
 
                         //Include "sub tables" in the report 
                         IReadOnlyList<StandaloneTable> standaloneTablesList = subtypeGroupTable.StandaloneTables;
                         foreach (StandaloneTable standaloneTable in standaloneTablesList)
-                            layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
+                            layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, string.Empty, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
 
                         //Since already added Table info to CsvLayoutList, don't do it again.
                         addToCsvLayoutList = false;
@@ -385,7 +385,7 @@ namespace UtilityNetworkPropertiesExtractor
                     else if (mapMember is StandaloneTable standaloneTable)
                     {
                         layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
-                        layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
+                        layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, standaloneTable.ActiveDefinitionQuery?.WhereClause, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
 
                         //Since already added Table info to CsvLayoutList, don't do it again.
                         addToCsvLayoutList = false;
@@ -435,7 +435,7 @@ namespace UtilityNetworkPropertiesExtractor
             }
         }
 
-        private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, ref List<CSVLayout> csvLayoutList, ref List<PopupLayout> popupLayoutList, ref List<DefinitionQueryLayout> definitionQueryLayout)
+        private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, string activeDefinitionQuery,  ref List<CSVLayout> csvLayoutList, ref List<PopupLayout> popupLayoutList, ref List<DefinitionQueryLayout> definitionQueryLayout)
         {
             int popupExpressionCount;
             string popupName = string.Empty;
@@ -443,7 +443,7 @@ namespace UtilityNetworkPropertiesExtractor
 
             CSVLayout csvLayout = new CSVLayout()
             {
-                ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(standaloneTable.DefinitionQuery),
+                ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(activeDefinitionQuery),
                 ClassName = standaloneTable.GetTable().GetName(),
                 GroupLayerName = Common.EncloseStringInDoubleQuotes(groupLayerName),
                 LayerName = Common.EncloseStringInDoubleQuotes(standaloneTable.Name),
@@ -478,8 +478,11 @@ namespace UtilityNetworkPropertiesExtractor
             GetPopupInfoInfoForCSV(popupLayoutList, popupExpressionCount, ref popupName, ref popupExpression);
 
             //Definition Queries
-            string additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, standaloneTable.DefinitionQueries, standaloneTable.DefinitionQuery, ref definitionQueryLayout);
-
+            // Only want additional queries if table is truely astandalone table OR is the top most SubtypeGroupTable table
+            string additionalDefQueriesText = string.Empty;  
+            if (! standaloneTable.IsSubtypeTable) //this is a sub table.  DON'T get additional queries on the sub tables as query defs can't be assigned at this level.
+                additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, standaloneTable.DefinitionQueries, activeDefinitionQuery, ref definitionQueryLayout);
+            
             //assign values
             csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
             csvLayout.DisplayField = Common.EncloseStringInDoubleQuotes(displayField);
@@ -719,7 +722,7 @@ namespace UtilityNetworkPropertiesExtractor
                 primarySymbology = "Representation";
         }
 
-        private static string AddDefinitionQueriesToList(CSVLayout csvLayout, IReadOnlyList<DefinitionQuery> definitionQuery, string activeFilterName, ref List<DefinitionQueryLayout> definitionQueryLayoutList)
+        private static string AddDefinitionQueriesToList(CSVLayout csvLayout, IReadOnlyList<DefinitionQuery> definitionQuery, string activeDefQueryName, ref List<DefinitionQueryLayout> definitionQueryLayoutList)
         {
             string returnMessage = string.Empty;
             int cnt = 0;
@@ -730,11 +733,11 @@ namespace UtilityNetworkPropertiesExtractor
                 bool activeDefQuery;
                 foreach (DefinitionQuery filter in definitionQuery)
                 {
-                    if (string.IsNullOrEmpty(activeFilterName))
+                    if (string.IsNullOrEmpty(activeDefQueryName))
                         activeDefQuery = false;
                     else
                     {
-                        if (activeFilterName == filter.Name)
+                        if (activeDefQueryName == filter.Name)
                             activeDefQuery = true;
                         else
                             activeDefQuery = false;
@@ -764,7 +767,7 @@ namespace UtilityNetworkPropertiesExtractor
             }
 
             // if active definition filter is defined, only indicate additional def queries if count is greater than 1.
-            if (!string.IsNullOrEmpty(activeFilterName))
+            if (!string.IsNullOrEmpty(activeDefQueryName))
             {
                 if (cnt > 1)
                     returnMessage = _defQueriesMesg;
@@ -836,7 +839,7 @@ namespace UtilityNetworkPropertiesExtractor
                 for (int i = 0; i < cimFeatureLayer.LabelClasses.Length; i++)
                 {
                     CIMLabelClass cimLabelClass = cimFeatureLayer.LabelClasses[i];
-                    string expr = cimLabelClass.Expression.Replace("\"", "'");  //double quotes messes up the delimeters in the CSV
+                    string expr = cimLabelClass.Expression?.Replace("\"", "'");  //double quotes messes up the delimeters in the CSV
 
                     LabelLayout labelRec = new LabelLayout()
                     {
