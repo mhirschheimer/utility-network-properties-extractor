@@ -170,8 +170,8 @@
         <button id="UtilityNetworkPropertiesExtractor_ExtractLocationButton" caption="Extract Location" className="ExtractLocationButton" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/FolderOpenState32.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/FolderOpenState32.png" keytip="YV">
           <tooltip heading="Tooltip Heading">Display Extract Location<disabledText /></tooltip>
         </button>
-        <button id="UtilityNetworkPropertiesExtractor_EditTemplatesButton" caption="Edit Templates" className="EditTemplatesButton" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/EditingOrganizeTemplates32.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/EditingOrganizeTemplates32.png" keytip="YU">>
-          <tooltip heading="Tooltip Heading">Extract Edit Templates Info<disabledText /></tooltip>
+        <button id="UtilityNetworkPropertiesExtractor_EditTemplatesButton" caption="Edit Templates" className="EditTemplatesButton" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/EditingOrganizeTemplates32.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/EditingOrganizeTemplates32.png" keytip="YU" condition="esri_mapping_MapCondition">
+			<tooltip heading="Tooltip Heading">Extract Edit Template Properties<disabledText /></tooltip>
         </button>
       </controls>
     </insertModule>
