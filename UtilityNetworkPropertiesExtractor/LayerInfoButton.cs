@@ -11,6 +11,7 @@
    limitations under the License.
 */
 using ArcGIS.Core.CIM;
+using ArcGIS.Core.Internal.CIM;
 using ArcGIS.Desktop.Core;
 using ArcGIS.Desktop.Framework.Contracts;
 using ArcGIS.Desktop.Framework.Dialogs;
@@ -216,7 +217,7 @@ namespace UtilityNetworkPropertiesExtractor
                             }
 
                             //symbology
-                            DetermineSymbology(cimFeatureLayer, out string primarySymbology, out string field1, out string field2, out string field3);
+                            DetermineSymbology(cimFeatureLayer, out string primarySymbology, out string field1, out string field2, out string field3, out bool allowSymbolPropConn);
 
                             //Subtypes
                             string subtypeValue = string.Empty;
@@ -258,6 +259,7 @@ namespace UtilityNetworkPropertiesExtractor
                             csvLayout.SymbologyField1 = field1;
                             csvLayout.SymbologyField2 = field2;
                             csvLayout.SymbologyField3 = field3;
+                            csvLayout.AllowSymbolPropConn = allowSymbolPropConn.ToString();
                             csvLayout.RefreshRate = cimFeatureLayer.RefreshRate.ToString();
                             csvLayout.ShowMapTips = cimFeatureLayer.ShowMapTips.ToString();
                             csvLayout.SubtypeValue = subtypeValue;
@@ -676,12 +678,13 @@ namespace UtilityNetworkPropertiesExtractor
             }
         }
 
-        private static void DetermineSymbology(CIMFeatureLayer cimFeatureLayerDef, out string primarySymbology, out string field1, out string field2, out string field3)
+        private static void DetermineSymbology(CIMFeatureLayer cimFeatureLayerDef, out string primarySymbology, out string field1, out string field2, out string field3, out bool allowSymbolPropConn)
         {
             primarySymbology = string.Empty;
             field1 = string.Empty;
             field2 = string.Empty;
             field3 = string.Empty;
+            allowSymbolPropConn = false; 
 
             //Symbology
             if (cimFeatureLayerDef.Renderer is CIMSimpleRenderer)
@@ -705,6 +708,24 @@ namespace UtilityNetworkPropertiesExtractor
                         field3 = uniqueRenderer.Fields[2];
                         break;
                 }
+
+                //Determine if the "Allow symbol property connection" is checked.  
+                //  If checked, this enables a feature layer to leverage attribute-driven symbology to connect symbol properties to attributes in the data.
+                //  https://pro.arcgis.com/en/pro-app/latest/help/mapping/layer-properties/attribute-driven-symbology.htm
+                CIMUniqueValueGroup[] cimUniqueValueGroups = uniqueRenderer.Groups;
+                foreach (CIMUniqueValueGroup cimUniqueValueGroup in cimUniqueValueGroups)
+                {
+                    CIMUniqueValueClass[] cimUniqueValueClasses = cimUniqueValueGroup.Classes;
+                    foreach(CIMUniqueValueClass cimUniqueValueClass in cimUniqueValueClasses)
+                    {
+                        var symbol = cimUniqueValueClass.Symbol;
+                        if (symbol.PrimitiveOverrides != null)
+                        {
+                            allowSymbolPropConn = true;
+                            break;  // stop after 1st instance found.
+                        }
+                    }
+                }
             }
             else if (cimFeatureLayerDef.Renderer is CIMChartRenderer)
                 primarySymbology = "Charts";
@@ -720,6 +741,7 @@ namespace UtilityNetworkPropertiesExtractor
                 primarySymbology = "Proportional Symbols";
             else if (cimFeatureLayerDef.Renderer is CIMRepresentationRenderer)
                 primarySymbology = "Representation";
+
         }
 
         private static string AddDefinitionQueriesToList(CSVLayout csvLayout, IReadOnlyList<DefinitionQuery> definitionQuery, string activeDefQueryName, ref List<DefinitionQueryLayout> definitionQueryLayoutList)
@@ -969,6 +991,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string SymbologyField1 { get; set; }
             public string SymbologyField2 { get; set; }
             public string SymbologyField3 { get; set; }
+            public string AllowSymbolPropConn { get; set; }
             public string EditTemplateCount { get; set; }
             public string DisplayField { get; set; }
             public string LabelCount { get; set; }
