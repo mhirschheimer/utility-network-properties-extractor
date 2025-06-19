@@ -116,7 +116,12 @@ namespace UtilityNetworkPropertiesExtractor
             foreach (FieldDescription fieldDesc in fieldDescList)
             {
                 fieldOrder += 1;
-                sw.WriteLine(className + "," + Common.EncloseStringInDoubleQuotes(tocName) + "," + subtype + "," + fieldDesc.Name + "," + fieldOrder + "," + fieldDesc.IsVisible + "," + fieldDesc.IsReadOnly + "," + fieldDesc.IsHighlighted + "," + Common.EncloseStringInDoubleQuotes(fieldDesc.Alias));
+
+                string fieldAlias = fieldDesc.Alias.Replace("\"", "");  // double quotes in the Alias is messing up the CSV columns. Remove them.
+                if (fieldAlias.IndexOf(",") > 0)
+                    fieldAlias = Common.EncloseStringInDoubleQuotes(fieldAlias);
+                
+                sw.WriteLine(className + "," + Common.EncloseStringInDoubleQuotes(tocName) + "," + subtype + "," + fieldDesc.Name + "," + fieldOrder + "," + fieldDesc.IsVisible + "," + fieldDesc.IsReadOnly + "," + fieldDesc.IsHighlighted + "," + fieldAlias);
             }
         }
     }

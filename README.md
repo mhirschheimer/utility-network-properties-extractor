@@ -1,6 +1,6 @@
 # utility-network-properties-extractor 
 
-For use with ArcGIS Pro 3.3
+For use with ArcGIS Pro 3.5
 
 This repository contains the source code for the 'Utility Network Property Extractor' ArcGIS Pro Add-in.  Single click buttons will create CSV files for the ArcGIS Utility Network, Geodatabase and Map properties.  There are also 6 efficiency tools to help set up your map and get your machine info.  
 
@@ -14,20 +14,20 @@ Language:              C#
 Subject:               Utility Network
 Author:                Mike Hirschheimer <mhirschheimer@esri.com>
 Organization:          Esri, http://www.esri.com
-Date:                  2/23/2023
-ArcGIS Pro:            3.3
+Date:                  5/20/2025
+ArcGIS Pro:            3.5
 Visual Studio:         2022
 .NET Target Framework: .NET 8
 ```
 
 
 ## ArcGIS Pro Add-In
- ![Screenshot](Screenshots/Toolbar2024.PNG) 
+ ![Screenshot](Screenshots/Toolbar_Pro35.png) 
       
 ### 1.  Single click buttons that extract Utility Network, Geodatabase and Map properties to CSV files
 * **Utility Network**:   UN FeatureService, Asset Groups, Domain Networks, Network Rules, Network Attributes, Network Categories, Network Diagram Info, Terminal Configuration, Trace Configuration, No Network Rules
 * **Geodatabase**:  Domain Values, Domain Assignments, Orphan Domains, Fields, Relationship Classes, Versioning Info, Attribute Rules, Contingent Values, GDB Object Names
-* **Map**:  Layer Info, Layer Scales, Layer Counts, Symbol Scales, Map Field Settings, Pop-up Fields
+* **Map**:  Layer Info, Layer Scales, Layer Counts, Symbol Scales, Map Field Settings, Pop-up Fields, Edit Template Properties
 
 * **CSV file(s)** are written to folder c:\temp\ProSDK_CSV\Pro Project Name\
                         
@@ -73,12 +73,12 @@ _Directions_
 
 ## Third party assemblies
 1.  Newtonsoft.JSON v13.0.3
-2.  Microsoft.Windows.Compatibility v8.0.7
+2.  Microsoft.Windows.Compatibility v9.0.5
 
 ## Compilation Directions
 1.  Download the source code
 2.  In Visual studio .NET compile the solution
-3.  **The source code was written against ArcGIS Pro SDK 3.1 and it won't compile cleanly against a 2.x version.  Please switch to the 2.9 branch to get the latest code for that release.
+3.  **The source code was written against ArcGIS Pro SDK 3.5 and it won't compile cleanly against an earlier 3.x version.  Please switch to the earlier 3.x branches to get the latest code for that release.
 4.  Start up ArcGIS Pro
 5.  Open a project and confirm that the "Utility Network Add-in" toolbar is present
 

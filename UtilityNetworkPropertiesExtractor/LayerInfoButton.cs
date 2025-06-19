@@ -11,6 +11,7 @@
    limitations under the License.
 */
 using ArcGIS.Core.CIM;
+using ArcGIS.Core.Internal.CIM;
 using ArcGIS.Desktop.Core;
 using ArcGIS.Desktop.Framework.Contracts;
 using ArcGIS.Desktop.Framework.Dialogs;
@@ -96,7 +97,6 @@ namespace UtilityNetworkPropertiesExtractor
                 }
             });
         }
-
         private static void InterrogateLayers(ref List<CSVLayout> csvLayoutList, ref List<PopupLayout> popupLayoutList, ref List<DisplayFilterLayout> displayFilterLayoutList, ref List<SharedTraceConfigurationLayout> sharedTraceConfigurationLayout, ref List<DefinitionQueryLayout> definitionQueryLayout, ref List<LabelLayout> labelLayoutList)
         {
             int displayFilterCount;
@@ -139,7 +139,7 @@ namespace UtilityNetworkPropertiesExtractor
                         }
                         else
                             layerContainer = string.Empty;
-
+                                               
                         csvLayout.IsExpanded = layer.IsExpanded.ToString();
                         csvLayout.IsVisible = layer.IsVisible.ToString();
                         csvLayout.MaxScale = Common.GetScaleValueText(layer.MaxScale);
@@ -151,10 +151,22 @@ namespace UtilityNetworkPropertiesExtractor
                     csvLayout.LayerName = Common.EncloseStringInDoubleQuotes(mapMember.Name);
                     csvLayout.GroupLayerName = Common.EncloseStringInDoubleQuotes(layerContainer);
 
+                    //Geodatabase Error Layer"
+                    if (mapMember is Layer lyr)
+                    {
+                        //If layer is the "Geodatabase Error Layer", use the layer name as the group layer name
+                        var def = lyr.GetDefinition() as CIMBaseLayer;
+                        if (def is CIMGeodatabaseErrorLayer)
+                        {
+                            csvLayout.GroupLayerName = Common.EncloseStringInDoubleQuotes(mapMember.Name);
+                            csvLayout.LayerName = string.Empty;
+                        }
+                    }
+
                     //BasicFeatureLayer (Layers that inherit from BasicFeatureLayer are FeatureLayer, AnnotationLayer and DimensionLayer)
                     if (mapMember is BasicFeatureLayer basicFeatureLayer)
                     {
-                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(basicFeatureLayer.DefinitionQuery);
+                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(basicFeatureLayer.ActiveDefinitionQuery?.WhereClause);
                         csvLayout.ClassName = basicFeatureLayer.GetTable().GetName();
                         csvLayout.GeometryType = basicFeatureLayer.ShapeType.ToString();
                         csvLayout.IsEditable = basicFeatureLayer.IsEditable.ToString();
@@ -205,7 +217,7 @@ namespace UtilityNetworkPropertiesExtractor
                             }
 
                             //symbology
-                            DetermineSymbology(cimFeatureLayer, out string primarySymbology, out string field1, out string field2, out string field3);
+                            DetermineSymbology(cimFeatureLayer, out string primarySymbology, out string field1, out string field2, out string field3, out bool allowSymbolPropConn);
 
                             //Subtypes
                             string subtypeValue = string.Empty;
@@ -219,7 +231,7 @@ namespace UtilityNetworkPropertiesExtractor
 
                             //Definition Queries
                             if (!featureLayer.IsSubtypeLayer)
-                                additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, featureLayer.DefinitionQueries, featureLayer.DefinitionQuery, ref definitionQueryLayout);
+                                additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, featureLayer.DefinitionQueries, featureLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
                             else
                             {
                                 //When the featurelayer is part of a subtype group layer, the definition query can only be set at the SGL level
@@ -247,6 +259,7 @@ namespace UtilityNetworkPropertiesExtractor
                             csvLayout.SymbologyField1 = field1;
                             csvLayout.SymbologyField2 = field2;
                             csvLayout.SymbologyField3 = field3;
+                            csvLayout.AllowSymbolPropConn = allowSymbolPropConn.ToString();
                             csvLayout.RefreshRate = cimFeatureLayer.RefreshRate.ToString();
                             csvLayout.ShowMapTips = cimFeatureLayer.ShowMapTips.ToString();
                             csvLayout.SubtypeValue = subtypeValue;
@@ -256,7 +269,7 @@ namespace UtilityNetworkPropertiesExtractor
                         else if (basicFeatureLayer is AnnotationLayer annotationLayer)
                         {
                             //Definition Queries
-                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, annotationLayer.DefinitionQueries, annotationLayer.DefinitionQuery, ref definitionQueryLayout);
+                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, annotationLayer.DefinitionQueries, annotationLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
                             csvLayout.GroupLayerName = csvLayout.LayerName;
                             csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
                         }
@@ -265,7 +278,7 @@ namespace UtilityNetworkPropertiesExtractor
                         else if (basicFeatureLayer is DimensionLayer dimensionLayer)
                         {
                             //Definition Queries
-                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, dimensionLayer.DefinitionQueries, dimensionLayer.DefinitionQuery, ref definitionQueryLayout);
+                            additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, dimensionLayer.DefinitionQueries, dimensionLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
                             csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
                         }
                     }
@@ -275,7 +288,7 @@ namespace UtilityNetworkPropertiesExtractor
                     {
                         csvLayout.GroupLayerName = csvLayout.LayerName;
                         csvLayout.LayerName = string.Empty;
-                       
+
                         CIMSubtypeGroupLayer cimSubtypeGroupLayer = subtypeGroupLayer.GetDefinition() as CIMSubtypeGroupLayer;
                         if (cimSubtypeGroupLayer.EnableDisplayFilters)
                         {
@@ -286,9 +299,9 @@ namespace UtilityNetworkPropertiesExtractor
                         }
 
                         //Definition Queries
-                        additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, subtypeGroupLayer.DefinitionQueries, subtypeGroupLayer.DefinitionQuery, ref definitionQueryLayout);
+                        additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, subtypeGroupLayer.DefinitionQueries, subtypeGroupLayer.ActiveDefinitionQuery?.Name, ref definitionQueryLayout);
 
-                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(subtypeGroupLayer.DefinitionQuery);
+                        csvLayout.ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(subtypeGroupLayer.ActiveDefinitionQuery?.WhereClause);
                         csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
                         csvLayout.DisplayFilterCount = displayFilterCount.ToString();
                         csvLayout.DisplayFilterExpresssion = displayFilterExpression;
@@ -300,8 +313,21 @@ namespace UtilityNetworkPropertiesExtractor
                     {
                         csvLayout.GroupLayerName = csvLayout.LayerName;
                         csvLayout.LayerName = string.Empty;
-                    }
 
+                        //Determine group type using the words used in the Pro UI
+                        switch (groupLayer.SublayerVisibilityMode)
+                        {
+                            case SublayerVisibilityMode.Exclusive:
+                                csvLayout.GroupType = "Radio";
+                                break;
+                            case SublayerVisibilityMode.Independent:
+                                csvLayout.GroupType = "Checkbox";
+                                break;
+                            default:
+                                csvLayout.GroupType = "Checkbox";
+                                break;
+                        }
+                    }
                     //Utiliy Network Layer
                     else if (mapMember is UtilityNetworkLayer utilityNetworkLayer)
                     {
@@ -346,12 +372,12 @@ namespace UtilityNetworkPropertiesExtractor
                     else if (mapMember is SubtypeGroupTable subtypeGroupTable)
                     {
                         layerContainer = Common.GetGroupLayerNameForStandaloneTable(subtypeGroupTable);
-                        layerPos = InterrogateStandaloneTable(subtypeGroupTable, layerPos, layerContainer, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
-                        
+                        layerPos = InterrogateStandaloneTable(subtypeGroupTable, layerPos, layerContainer, subtypeGroupTable.ActiveDefinitionQuery?.WhereClause,  ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
+
                         //Include "sub tables" in the report 
                         IReadOnlyList<StandaloneTable> standaloneTablesList = subtypeGroupTable.StandaloneTables;
                         foreach (StandaloneTable standaloneTable in standaloneTablesList)
-                            layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
+                            layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, mapMember.Name, string.Empty, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
 
                         //Since already added Table info to CsvLayoutList, don't do it again.
                         addToCsvLayoutList = false;
@@ -361,7 +387,7 @@ namespace UtilityNetworkPropertiesExtractor
                     else if (mapMember is StandaloneTable standaloneTable)
                     {
                         layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
-                        layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
+                        layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, standaloneTable.ActiveDefinitionQuery?.WhereClause, ref csvLayoutList, ref popupLayoutList, ref definitionQueryLayout);
 
                         //Since already added Table info to CsvLayoutList, don't do it again.
                         addToCsvLayoutList = false;
@@ -411,7 +437,7 @@ namespace UtilityNetworkPropertiesExtractor
             }
         }
 
-        private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, ref List<CSVLayout> csvLayoutList, ref List<PopupLayout> popupLayoutList, ref List<DefinitionQueryLayout> definitionQueryLayout)
+        private static int InterrogateStandaloneTable(StandaloneTable standaloneTable, int layerPos, string groupLayerName, string activeDefinitionQuery,  ref List<CSVLayout> csvLayoutList, ref List<PopupLayout> popupLayoutList, ref List<DefinitionQueryLayout> definitionQueryLayout)
         {
             int popupExpressionCount;
             string popupName = string.Empty;
@@ -419,7 +445,7 @@ namespace UtilityNetworkPropertiesExtractor
 
             CSVLayout csvLayout = new CSVLayout()
             {
-                ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(standaloneTable.DefinitionQuery),
+                ActiveDefinitionQuery = Common.EncloseStringInDoubleQuotes(activeDefinitionQuery),
                 ClassName = standaloneTable.GetTable().GetName(),
                 GroupLayerName = Common.EncloseStringInDoubleQuotes(groupLayerName),
                 LayerName = Common.EncloseStringInDoubleQuotes(standaloneTable.Name),
@@ -454,8 +480,11 @@ namespace UtilityNetworkPropertiesExtractor
             GetPopupInfoInfoForCSV(popupLayoutList, popupExpressionCount, ref popupName, ref popupExpression);
 
             //Definition Queries
-            string additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, standaloneTable.DefinitionQueries, standaloneTable.DefinitionQuery, ref definitionQueryLayout);
-
+            // Only want additional queries if table is truely astandalone table OR is the top most SubtypeGroupTable table
+            string additionalDefQueriesText = string.Empty;  
+            if (! standaloneTable.IsSubtypeTable) //this is a sub table.  DON'T get additional queries on the sub tables as query defs can't be assigned at this level.
+                additionalDefQueriesText = AddDefinitionQueriesToList(csvLayout, standaloneTable.DefinitionQueries, activeDefinitionQuery, ref definitionQueryLayout);
+            
             //assign values
             csvLayout.AdditionalDefinitionQueries = additionalDefQueriesText;
             csvLayout.DisplayField = Common.EncloseStringInDoubleQuotes(displayField);
@@ -649,12 +678,13 @@ namespace UtilityNetworkPropertiesExtractor
             }
         }
 
-        private static void DetermineSymbology(CIMFeatureLayer cimFeatureLayerDef, out string primarySymbology, out string field1, out string field2, out string field3)
+        private static void DetermineSymbology(CIMFeatureLayer cimFeatureLayerDef, out string primarySymbology, out string field1, out string field2, out string field3, out bool allowSymbolPropConn)
         {
             primarySymbology = string.Empty;
             field1 = string.Empty;
             field2 = string.Empty;
             field3 = string.Empty;
+            allowSymbolPropConn = false; 
 
             //Symbology
             if (cimFeatureLayerDef.Renderer is CIMSimpleRenderer)
@@ -678,6 +708,24 @@ namespace UtilityNetworkPropertiesExtractor
                         field3 = uniqueRenderer.Fields[2];
                         break;
                 }
+
+                //Determine if the "Allow symbol property connection" is checked.  
+                //  If checked, this enables a feature layer to leverage attribute-driven symbology to connect symbol properties to attributes in the data.
+                //  https://pro.arcgis.com/en/pro-app/latest/help/mapping/layer-properties/attribute-driven-symbology.htm
+                CIMUniqueValueGroup[] cimUniqueValueGroups = uniqueRenderer.Groups;
+                foreach (CIMUniqueValueGroup cimUniqueValueGroup in cimUniqueValueGroups)
+                {
+                    CIMUniqueValueClass[] cimUniqueValueClasses = cimUniqueValueGroup.Classes;
+                    foreach(CIMUniqueValueClass cimUniqueValueClass in cimUniqueValueClasses)
+                    {
+                        var symbol = cimUniqueValueClass.Symbol;
+                        if (symbol.PrimitiveOverrides != null)
+                        {
+                            allowSymbolPropConn = true;
+                            break;  // stop after 1st instance found.
+                        }
+                    }
+                }
             }
             else if (cimFeatureLayerDef.Renderer is CIMChartRenderer)
                 primarySymbology = "Charts";
@@ -693,27 +741,35 @@ namespace UtilityNetworkPropertiesExtractor
                 primarySymbology = "Proportional Symbols";
             else if (cimFeatureLayerDef.Renderer is CIMRepresentationRenderer)
                 primarySymbology = "Representation";
+
         }
 
-        private static string AddDefinitionQueriesToList(CSVLayout csvLayout, IReadOnlyList<DefinitionQuery> definitionQuery, string activeFilterName, ref List<DefinitionQueryLayout> definitionQueryLayoutList)
+        private static string AddDefinitionQueriesToList(CSVLayout csvLayout, IReadOnlyList<DefinitionQuery> definitionQuery, string activeDefQueryName, ref List<DefinitionQueryLayout> definitionQueryLayoutList)
         {
             string returnMessage = string.Empty;
             int cnt = 0;
 
             if (definitionQuery.Count > 0)
             {
+                string whereClause;
                 bool activeDefQuery;
                 foreach (DefinitionQuery filter in definitionQuery)
                 {
-                    if (string.IsNullOrEmpty(activeFilterName))
+                    if (string.IsNullOrEmpty(activeDefQueryName))
                         activeDefQuery = false;
                     else
                     {
-                        if (activeFilterName == filter.Name)
+                        if (activeDefQueryName == filter.Name)
                             activeDefQuery = true;
                         else
                             activeDefQuery = false;
                     }
+
+                    // Spatial Clause added at Pro 3.5
+                    if (filter.SpatialReference != null)
+                        whereClause = "Spatial Clause";
+                    else
+                        whereClause = filter.WhereClause;
 
                     DefinitionQueryLayout definitionQueryLayout = new DefinitionQueryLayout()
                     {
@@ -721,8 +777,9 @@ namespace UtilityNetworkPropertiesExtractor
                         LayerType = csvLayout.LayerType,
                         GroupLayerName = csvLayout.GroupLayerName,
                         LayerName = csvLayout.LayerName,
-                        DefinitionQueryName = filter.Name,
-                        DefinitionQuery = Common.EncloseStringInDoubleQuotes(filter.Name),
+                        DefinitionQueryName = Common.EncloseStringInDoubleQuotes(filter.Name),
+                        DefinitionQuery = Common.EncloseStringInDoubleQuotes(whereClause),
+                        IsValid = filter.IsValid,
                         Active = activeDefQuery.ToString()
                     };
 
@@ -732,7 +789,7 @@ namespace UtilityNetworkPropertiesExtractor
             }
 
             // if active definition filter is defined, only indicate additional def queries if count is greater than 1.
-            if (!string.IsNullOrEmpty(activeFilterName))
+            if (!string.IsNullOrEmpty(activeDefQueryName))
             {
                 if (cnt > 1)
                     returnMessage = _defQueriesMesg;
@@ -804,7 +861,7 @@ namespace UtilityNetworkPropertiesExtractor
                 for (int i = 0; i < cimFeatureLayer.LabelClasses.Length; i++)
                 {
                     CIMLabelClass cimLabelClass = cimFeatureLayer.LabelClasses[i];
-                    string expr = cimLabelClass.Expression.Replace("\"", "'");  //double quotes messes up the delimeters in the CSV
+                    string expr = cimLabelClass.Expression?.Replace("\"", "'");  //double quotes messes up the delimeters in the CSV
 
                     LabelLayout labelRec = new LabelLayout()
                     {
@@ -914,6 +971,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string ClassName { get; set; }
             public string IsSubtypeLayer { get; set; }
             public string SubtypeValue { get; set; }
+            public string GroupType { get; set; }
             public string GeometryType { get; set; }
             public string IsSnappable { get; set; }
             public string IsSelectable { get; set; }
@@ -933,6 +991,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string SymbologyField1 { get; set; }
             public string SymbologyField2 { get; set; }
             public string SymbologyField3 { get; set; }
+            public string AllowSymbolPropConn { get; set; }
             public string EditTemplateCount { get; set; }
             public string DisplayField { get; set; }
             public string LabelCount { get; set; }
@@ -968,6 +1027,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string Active { get; set; }
             public string DefinitionQueryName { get; set; }
             public string DefinitionQuery { get; set; }
+            public bool IsValid { get; set; }
         }
 
         private class DisplayFilterLayout
