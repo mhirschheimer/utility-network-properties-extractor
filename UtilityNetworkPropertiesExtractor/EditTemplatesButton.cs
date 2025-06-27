@@ -175,11 +175,14 @@ namespace UtilityNetworkPropertiesExtractor
                         else if (mapMember is StandaloneTable standaloneTable)
                         {
                             TableDefinition tableDefinition = getTableDefinitionOfMapMember(DataSourceInMapList, standaloneTable);
-                            IReadOnlyList<Field> fieldsList = tableDefinition.GetFields();
-                            IReadOnlyList<Subtype> subtypesList = tableDefinition.GetSubtypes();
+                            if (tableDefinition != null)
+                            {
+                                IReadOnlyList<Field> fieldsList = tableDefinition.GetFields();
+                                IReadOnlyList<Subtype> subtypesList = tableDefinition.GetSubtypes();
 
-                            layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
-                            layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, tableDefinition, fieldsList, subtypesList, ref csvLayoutList);
+                                layerContainer = Common.GetGroupLayerNameForStandaloneTable(standaloneTable);
+                                layerPos = InterrogateStandaloneTable(standaloneTable, layerPos, layerContainer, tableDefinition, fieldsList, subtypesList, ref csvLayoutList);
+                            }
                         }
 
                         layerPos += 1;
