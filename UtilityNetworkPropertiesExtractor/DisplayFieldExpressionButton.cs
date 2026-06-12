@@ -11,7 +11,6 @@
    limitations under the License.
 */
 using ArcGIS.Core.CIM;
-using ArcGIS.Core.Data.UtilityNetwork;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
 using ArcGIS.Desktop.Mapping;
 using System;
@@ -42,13 +41,6 @@ namespace UtilityNetworkPropertiesExtractor
         {
             return QueuedTask.Run(() =>
             {
-                UtilityNetwork utilityNetwork = Common.GetUtilityNetwork(out FeatureLayer featureLayerInUn);
-                if (utilityNetwork == null)
-                {
-                    MessageBox.Show("Utility Network not found in the active map", "Set Display Field Expression", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
                 //Confirm with user before proceeding
                 DialogResult dialogResult = MessageBox.Show("Modify display field expression to be Utility Network meaningful?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (dialogResult == DialogResult.No)
@@ -60,17 +52,19 @@ namespace UtilityNetworkPropertiesExtractor
                 //Get list of all featurelayers in the map
                 List<FeatureLayer> featureLayerList = MapView.Active.Map.GetLayersAsFlattenedList().OfType<FeatureLayer>().ToList();
 
-                //Standalone Tables in the map
+                //Standalone Tables in the map (this will also get us Subtype Group Tables
                 IReadOnlyList<StandaloneTable> standaloneTableList = MapView.Active.Map.StandaloneTables;
-
-                int total = featureLayerList.Count + standaloneTableList.Count;
+                int tableCount = Common.GetCountOfAllTablesInMap();
+                
+                //Sum up all feature layers, standalone tables, subtype group tables and the "sub tables"
+                int total = featureLayerList.Count + tableCount;             
 
                 using (ProgressDialog progress = new ProgressDialog("Processing", "Canceled", (uint)total, false))
                 {
                     string progressMessage = string.Empty;
                     CancelableProgressorSource cps = new CancelableProgressorSource(progress)
                     {
-                        Max = (uint)featureLayerList.Count + (uint)standaloneTableList.Count
+                        Max = (uint)featureLayerList.Count + (uint)tableCount
                     };
 
                     QueuedTask.Run(() =>

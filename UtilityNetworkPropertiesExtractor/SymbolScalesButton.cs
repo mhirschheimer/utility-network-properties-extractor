@@ -143,27 +143,30 @@ namespace UtilityNetworkPropertiesExtractor
                             //Unqiue Renderer
                             else if (cimFeatureLayerDef.Renderer is CIMUniqueValueRenderer uniqueRenderer)
                             {
-                                CIMUniqueValueGroup[] cimUniqueValueGroups = uniqueRenderer.Groups;
-                                foreach (CIMUniqueValueGroup cimUniqueValueGroup in cimUniqueValueGroups)
+                                if (uniqueRenderer.Groups != null)
                                 {
-                                    CIMUniqueValueClass[] cimUniqueValueClasses = cimUniqueValueGroup.Classes;
-                                    foreach (CIMUniqueValueClass cimUniqueValueClass in cimUniqueValueClasses)
+                                    CIMUniqueValueGroup[] cimUniqueValueGroups = uniqueRenderer.Groups;
+                                    foreach (CIMUniqueValueGroup cimUniqueValueGroup in cimUniqueValueGroups)
                                     {
-                                        csvLayout = new CSVLayout()
+                                        CIMUniqueValueClass[] cimUniqueValueClasses = cimUniqueValueGroup.Classes;
+                                        foreach (CIMUniqueValueClass cimUniqueValueClass in cimUniqueValueClasses)
                                         {
-                                            LayerPos = layerPos.ToString(),
-                                            GroupLayerName = groupLayerName,
-                                            LayerName = Common.EncloseStringInDoubleQuotes(layer.Name),
-                                            SymbolMinScale = GetScaleValue(cimUniqueValueClass.Symbol.MinScale),
-                                            SymbolMaxScale = GetScaleValue(cimUniqueValueClass.Symbol.MaxScale)
-                                        };
+                                            csvLayout = new CSVLayout()
+                                            {
+                                                LayerPos = layerPos.ToString(),
+                                                GroupLayerName = groupLayerName,
+                                                LayerName = Common.EncloseStringInDoubleQuotes(layer.Name),
+                                                SymbolMinScale = GetScaleValue(cimUniqueValueClass.Symbol.MinScale),
+                                                SymbolMaxScale = GetScaleValue(cimUniqueValueClass.Symbol.MaxScale)
+                                            };
 
-                                        if (! string.IsNullOrEmpty(cimUniqueValueClass.Label))
-                                            csvLayout.SymbolLabel = Common.EncloseStringInDoubleQuotes(cimUniqueValueClass.Label);
-                                        else
-                                            csvLayout.SymbolLabel = "<blank>";
+                                            if (!string.IsNullOrEmpty(cimUniqueValueClass.Label))
+                                                csvLayout.SymbolLabel = Common.EncloseStringInDoubleQuotes(cimUniqueValueClass.Label);
+                                            else
+                                                csvLayout.SymbolLabel = "<blank>";
 
-                                        CSVLayoutList.Add(csvLayout);
+                                            CSVLayoutList.Add(csvLayout);
+                                        }
                                     }
                                 }
                             }
