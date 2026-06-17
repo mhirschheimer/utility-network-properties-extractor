@@ -23,6 +23,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
+using static System.Data.Odbc.ODBC32;
 using MessageBox = System.Windows.MessageBox;
 
 namespace UtilityNetworkPropertiesExtractor
@@ -127,6 +128,21 @@ namespace UtilityNetworkPropertiesExtractor
                                 {
                                     if (domainNetwork is TelecomDomainNetwork tdn)
                                     {
+                                        //Color Sets
+                                        CSVColorSets emptyColorSetsRec = new CSVColorSets();
+                                        properties = Common.GetPropertiesOfClass(emptyColorSetsRec);
+                                        columnHeader = Common.ExtractClassPropertyNamesToString(properties);
+                                        sw.WriteLine(columnHeader);
+
+                                        List<CSVColorSets> csvColorSets = new List<CSVColorSets>();
+                                        ColorSets(tdn, ref csvColorSets);
+                                        foreach (CSVColorSets row in csvColorSets)
+                                        {
+                                            output = Common.ExtractClassValuesToString(row, properties);
+                                            sw.WriteLine(output);
+                                        }
+
+                                        //Color Schemes
                                         CSVColorSchemes emptyColorSchemesRec = new CSVColorSchemes();
                                         properties = Common.GetPropertiesOfClass(emptyColorSchemesRec);
                                         columnHeader = Common.ExtractClassPropertyNamesToString(properties);
@@ -139,6 +155,49 @@ namespace UtilityNetworkPropertiesExtractor
                                             output = Common.ExtractClassValuesToString(row, properties);
                                             sw.WriteLine(output);
                                         }
+
+                                        //Divide Policy
+                                        CSVDividePolicy emptyDivideRec = new CSVDividePolicy();
+                                        properties = Common.GetPropertiesOfClass(emptyDivideRec);
+                                        columnHeader = Common.ExtractClassPropertyNamesToString(properties);
+                                        sw.WriteLine(columnHeader);
+
+                                        List<CSVDividePolicy> csvDividePolicy = new List<CSVDividePolicy>();
+                                        DividePolicy(tdn, ref csvDividePolicy);
+                                        foreach (CSVDividePolicy row in csvDividePolicy)
+                                        {
+                                            output = Common.ExtractClassValuesToString(row, properties);
+                                            sw.WriteLine(output);
+                                        }
+
+                                        //Combine Policy
+                                        CSVCombinePolicy emptyCombineRec = new CSVCombinePolicy();
+                                        properties = Common.GetPropertiesOfClass(emptyCombineRec);
+                                        columnHeader = Common.ExtractClassPropertyNamesToString(properties);
+                                        sw.WriteLine(columnHeader);
+
+                                        List<CSVCombinePolicy> csvCombinePolicy = new List<CSVCombinePolicy>();
+                                        CombinePolicy(tdn, ref csvCombinePolicy);
+                                        foreach (CSVCombinePolicy row in csvCombinePolicy)
+                                        {
+                                            output = Common.ExtractClassValuesToString(row, properties);
+                                            sw.WriteLine(output);
+                                        }
+
+                                        //Wavelengths
+                                        CSVWavelength emptyWavelengthRec = new CSVWavelength();
+                                        properties = Common.GetPropertiesOfClass(emptyWavelengthRec);
+                                        columnHeader = Common.ExtractClassPropertyNamesToString(properties);
+                                        sw.WriteLine(columnHeader);
+
+                                        List<CSVWavelength> csvWavelengths = new List<CSVWavelength>();
+                                        Wavelengths(tdn, ref csvWavelengths);
+                                        foreach (CSVWavelength row in csvWavelengths)
+                                        {
+                                            output = Common.ExtractClassValuesToString(row, properties);
+                                            sw.WriteLine(output);
+                                        }
+
                                     }
                                 }
                             }
@@ -151,7 +210,33 @@ namespace UtilityNetworkPropertiesExtractor
                 }
             });
         }
-                
+
+        private static void ColorSets(TelecomDomainNetwork tdn, ref List<CSVColorSets> csvColorSets)
+        {
+            IReadOnlyList<ColorSet> colorSets = tdn.ColorSets;
+            foreach (ColorSet colorSet in colorSets)
+            {
+                foreach (ColorCode colorCode in colorSet.ColorCodes)
+                {
+                    CSVColorSets rec = new CSVColorSets()
+                    {
+                        ColorSetName = colorSet.Name,
+                        ColorCodeId = colorCode.ID.ToString(),
+                        ColorCodeName = colorCode.Name,
+                        ColorCodeLabel = colorCode.Label,
+                    };
+
+                    if (colorCode.HexCodes != null)
+                        rec.HexCode = Common.EncloseStringInDoubleQuotes(string.Join(", ", colorCode.HexCodes));
+
+                    csvColorSets.Add(rec);
+                }   
+            }
+
+            CSVColorSets emptyRec = new CSVColorSets();
+            csvColorSets.Add(emptyRec);
+        }
+
         private static void ColorSchemes(TelecomDomainNetwork tdn, ref List<CSVColorSchemes> csvColorSchemes)
         {
             IReadOnlyList<ColorScheme> colorSchemes = tdn.ColorSchemes;
@@ -186,6 +271,69 @@ namespace UtilityNetworkPropertiesExtractor
 
             CSVColorSchemes emptyRec = new CSVColorSchemes();
             csvColorSchemes.Add(emptyRec);
+        }
+
+        private static void CombinePolicy(TelecomDomainNetwork tdn, ref List<CSVCombinePolicy> csvCombinePolicy)
+        {
+            IReadOnlyList<CombinePolicy> combinePolicies = tdn.CombinePolicies;
+            foreach (CombinePolicy policy in combinePolicies)
+            {
+                CSVCombinePolicy rec = new CSVCombinePolicy()
+                {
+                    ClassName = policy.NetworkSource.Name,
+                    FieldName = policy.FieldName,
+                    Policy = policy.Policy.ToString()
+                };
+
+                csvCombinePolicy.Add(rec);
+            }
+
+            CSVCombinePolicy emptyRec = new CSVCombinePolicy();
+            csvCombinePolicy.Add(emptyRec);
+        }
+
+        private static void DividePolicy(TelecomDomainNetwork tdn, ref List<CSVDividePolicy> csvDividePolicy)
+        {
+            IReadOnlyList<DividePolicy> dividePolicies = tdn.DividePolicies;
+            foreach (DividePolicy policy in dividePolicies)
+            {
+                CSVDividePolicy rec = new CSVDividePolicy()
+                {
+                    ClassName = policy.NetworkSource.Name,
+                    FieldName = policy.FieldName,
+                    Policy = policy.Policy.ToString()                   
+                };
+
+                csvDividePolicy.Add(rec);
+            }
+
+            CSVDividePolicy emptyRec = new CSVDividePolicy();
+            csvDividePolicy.Add(emptyRec);
+        }
+
+        private static void Wavelengths(TelecomDomainNetwork tdn, ref List<CSVWavelength> csvWavelengths)
+        {
+            IReadOnlyList<WavelengthScheme> wavelengthSchemes= tdn.WavelengthSchemes;
+            foreach (WavelengthScheme scheme in wavelengthSchemes)
+            {
+                foreach (Wavelength wavelength in scheme.Wavelengths)
+                {
+
+                    CSVWavelength rec = new CSVWavelength()
+                    {
+                        SchemeName = scheme.Name,
+                        ID = wavelength.ID.ToString(),
+                        Name = wavelength.Name,
+                        Length = Convert.ToString(wavelength.Length)
+                    };
+
+                    csvWavelengths.Add(rec);
+                }
+            }
+
+
+            CSVWavelength emptyRec = new CSVWavelength();
+            csvWavelengths.Add(emptyRec);
         }
 
         private static void NetworkTopologyInfo(UtilityNetwork utilityNetwork, ref List<CSVLayoutNetworkTopology> csvLayoutNetworkTopoList)
@@ -601,6 +749,16 @@ namespace UtilityNetworkPropertiesExtractor
             public string Value { get; set; }
         }
 
+        private class CSVColorSets
+        {
+            public string ColorSets { get; set; }
+            public string ColorSetName { get; set; }
+            public string ColorCodeId { get; set; }
+            public string ColorCodeName { get; set; }
+            public string ColorCodeLabel { get; set; }
+            public string HexCode { get; set; }
+        }
+
         private class CSVColorSchemes
         {
             public string ColorSchemes { get; set; }
@@ -614,6 +772,31 @@ namespace UtilityNetworkPropertiesExtractor
             public string Capacity { get; set; }
             public string Delimeter { get; set; }
 
+        }
+
+        private class CSVDividePolicy
+        {
+            public string TelecomObjectDividePolicy { get; set; }
+            public string ClassName { get; set; }
+            public string FieldName { get; set; }
+            public string Policy { get; set; }
+        }
+
+        private class CSVCombinePolicy
+        {
+            public string TelecomObjectCombinePolicy { get; set; }
+            public string ClassName { get; set; }
+            public string FieldName { get; set; }
+            public string Policy { get; set; }
+        }
+
+        private class CSVWavelength
+        {
+            public string WavelengthSchemes { get; set; }
+            public string SchemeName { get; set; }
+            public string ID { get; set; }
+            public string Name { get; set; }
+            public string Length { get; set; }
         }
     }
 }
