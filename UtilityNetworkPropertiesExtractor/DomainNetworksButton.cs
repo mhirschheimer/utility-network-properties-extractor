@@ -12,12 +12,14 @@
 */
 using ArcGIS.Core.Data;
 using ArcGIS.Core.Data.UtilityNetwork;
+using ArcGIS.Core.Data.UtilityNetwork.Telecom;
 using ArcGIS.Core.Data.UtilityNetwork.Trace;
 using ArcGIS.Desktop.Framework.Contracts;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
@@ -116,6 +118,31 @@ namespace UtilityNetworkPropertiesExtractor
                                 sw.WriteLine(output);
                             }
 
+
+                            //Telecom Domain Network section
+                            if (utilityNetworkDataSourceInMap.UtilityNetwork.HasTelecomNetwork) {
+
+                                IReadOnlyList<DomainNetwork> domainNetworks = utilityNetworkDataSourceInMap.UtilityNetwork.GetDefinition().GetDomainNetworks();
+                                foreach (DomainNetwork domainNetwork in domainNetworks)
+                                {
+                                    if (domainNetwork is TelecomDomainNetwork tdn)
+                                    {
+                                        CSVColorSchemes emptyColorSchemesRec = new CSVColorSchemes();
+                                        properties = Common.GetPropertiesOfClass(emptyColorSchemesRec);
+                                        columnHeader = Common.ExtractClassPropertyNamesToString(properties);
+                                        sw.WriteLine(columnHeader);
+
+                                        List<CSVColorSchemes> csvColorSchemes = new List<CSVColorSchemes>();
+                                        ColorSchemes(tdn, ref csvColorSchemes);
+                                        foreach (CSVColorSchemes row in csvColorSchemes)
+                                        {
+                                            output = Common.ExtractClassValuesToString(row, properties);
+                                            sw.WriteLine(output);
+                                        }
+                                    }
+                                }
+                            }
+
                             sw.Flush();
                             sw.Close();
 
@@ -124,29 +151,65 @@ namespace UtilityNetworkPropertiesExtractor
                 }
             });
         }
+                
+        private static void ColorSchemes(TelecomDomainNetwork tdn, ref List<CSVColorSchemes> csvColorSchemes)
+        {
+            IReadOnlyList<ColorScheme> colorSchemes = tdn.ColorSchemes;
+            foreach (ColorScheme colorScheme in colorSchemes)
+            {
+                int i = 0;
+                IReadOnlyList<ColorSchemeGroup> colorSchemeGroups = colorScheme.Groups;
+                foreach (ColorSchemeGroup group in colorSchemeGroups)
+                {
+                    i += 1;
+
+                    CSVColorSchemes rec = new CSVColorSchemes();
+
+                    if (i == 1) // This aligns with how the Pro UI displays this information.
+                    {
+                        rec.ColorSchemeName = colorScheme.Name;
+                        rec.ColorSchemeId = colorScheme.ID.ToString();
+                        rec.Levels = colorSchemeGroups.Count.ToString();
+                        rec.GroupDelimeter = colorScheme.GroupDelimiter;
+                    }
+
+                    IReadOnlyList<ColorCode> colorCodes = group.ColorCodes;
+                    rec.Labels = Common.EncloseStringInDoubleQuotes(string.Join(", ", colorCodes.Select(c => c.Label)));
+                    rec.GroupName = group.Name;
+                    rec.GroupLevels = group.Level.ToString();
+                    rec.Capacity = Common.EncloseStringInDoubleQuotes(string.Join(",", group.Capacity));
+                    rec.Delimeter = group.Delimiter;
+
+                    csvColorSchemes.Add(rec);
+                }
+            }
+
+            CSVColorSchemes emptyRec = new CSVColorSchemes();
+            csvColorSchemes.Add(emptyRec);
+        }
 
         private static void NetworkTopologyInfo(UtilityNetwork utilityNetwork, ref List<CSVLayoutNetworkTopology> csvLayoutNetworkTopoList)
         {
             //Build List of Network Topology Properties
             UtilityNetworkState utilityNetworkState = utilityNetwork.GetState();
 
-            CSVLayoutNetworkTopology rec = new CSVLayoutNetworkTopology() 
-            { 
-                Property = "Is Enabled", 
+            CSVLayoutNetworkTopology rec = new CSVLayoutNetworkTopology()
+            {
+                Property = "Is Enabled",
                 Value = utilityNetworkState.IsNetworkTopologyEnabled.ToString()
             };
             csvLayoutNetworkTopoList.Add(rec);
 
-            rec = new CSVLayoutNetworkTopology() 
-            { 
-                Property = "Dirty Area Count", 
-                Value = GetErrorCount(utilityNetwork, SystemTableType.DirtyAreas).ToString() 
+            rec = new CSVLayoutNetworkTopology()
+            {
+                Property = "Dirty Area Count",
+                Value = GetErrorCount(utilityNetwork, SystemTableType.DirtyAreas).ToString()
             };
             csvLayoutNetworkTopoList.Add(rec);
 
-            rec = new CSVLayoutNetworkTopology() 
-            { 
-                Property = "Last Full Validate Time", 
+            rec = new CSVLayoutNetworkTopology()
+            {
+                Property = "Last Full Validate Time",
                 Value = utilityNetworkState.LastConsistentMoment.ToString()
             };
             csvLayoutNetworkTopoList.Add(rec);
@@ -177,6 +240,11 @@ namespace UtilityNetworkPropertiesExtractor
                     TierDefinition = domainNetwork.TierDefinition.ToString(),
                     SubnetworkControllerType = domainNetwork.SubnetworkControllerType.ToString()
                 };
+
+                if (domainNetwork is TelecomDomainNetwork tdn)
+                    networkRec.DomainNetworkType = "Telecom Domain Network";
+                else
+                    networkRec.DomainNetworkType = "Traditional Domain Network";
 
                 myDomainNetworksCSVList.Add(networkRec);
 
@@ -214,7 +282,6 @@ namespace UtilityNetworkPropertiesExtractor
 
         private static void TierInfo(UtilityNetworkDataSourceInMap utilityNetworkDataSourceInMap, IReadOnlyList<DomainNetwork> domainNetworksList, ref List<CSVLayoutTierInfo> tierInfoCSVList)
         {
-
             foreach (DomainNetwork domainNetwork in domainNetworksList)
             {
                 foreach (Tier tier in domainNetwork.Tiers)
@@ -493,6 +560,9 @@ namespace UtilityNetworkPropertiesExtractor
                     tierInfoCSVList.Add(emptyTierRec);
                 }
             }
+
+            CSVLayoutTierInfo emptyRec = new CSVLayoutTierInfo();
+            tierInfoCSVList.Add(emptyRec);
         }
 
         private class CSVLayoutNetworkTopology
@@ -507,6 +577,7 @@ namespace UtilityNetworkPropertiesExtractor
             public string DomainNetworkID { get; set; }
             public string DomainName { get; set; }
             public string Alias { get; set; }
+            public string DomainNetworkType { get; set; }
             public string TierDefinition { get; set; }
             public string SubnetworkControllerType { get; set; }
             public string TierRank { get; set; }
@@ -528,6 +599,21 @@ namespace UtilityNetworkPropertiesExtractor
             public string Property { get; set; }
             public string Descriptor { get; set; }
             public string Value { get; set; }
+        }
+
+        private class CSVColorSchemes
+        {
+            public string ColorSchemes { get; set; }
+            public string ColorSchemeName { get; set; }
+            public string ColorSchemeId { get; set; }
+            public string GroupDelimeter { get; set; }
+            public string Levels { get; set; }
+            public string GroupLevels { get; set; }
+            public string GroupName { get; set; }
+            public string Labels { get; set; }
+            public string Capacity { get; set; }
+            public string Delimeter { get; set; }
+
         }
     }
 }
