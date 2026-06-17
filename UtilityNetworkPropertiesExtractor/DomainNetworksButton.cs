@@ -119,7 +119,6 @@ namespace UtilityNetworkPropertiesExtractor
                                 sw.WriteLine(output);
                             }
 
-
                             //Telecom Domain Network section
                             if (utilityNetworkDataSourceInMap.UtilityNetwork.HasTelecomNetwork) {
 
@@ -155,6 +154,21 @@ namespace UtilityNetworkPropertiesExtractor
                                             output = Common.ExtractClassValuesToString(row, properties);
                                             sw.WriteLine(output);
                                         }
+
+                                        //Circuit Properties
+                                        CSVCircuitProperties emptyCircuitPropRec = new CSVCircuitProperties();
+                                        properties = Common.GetPropertiesOfClass(emptyCircuitPropRec);
+                                        columnHeader = Common.ExtractClassPropertyNamesToString(properties);
+                                        sw.WriteLine(columnHeader);
+
+                                        List<CSVCircuitProperties> csvCircuitProps = new List<CSVCircuitProperties>();
+                                        CircuitProperties(tdn, ref csvCircuitProps);
+                                        foreach (CSVCircuitProperties row in csvCircuitProps)
+                                        {
+                                            output = Common.ExtractClassValuesToString(row, properties);
+                                            sw.WriteLine(output);
+                                        }
+
 
                                         //Divide Policy
                                         CSVDividePolicy emptyDivideRec = new CSVDividePolicy();
@@ -209,6 +223,64 @@ namespace UtilityNetworkPropertiesExtractor
                     }
                 }
             });
+        }
+
+        private static void CircuitProperties(TelecomDomainNetwork tdn, ref List<CSVCircuitProperties> csvCircuitProps)
+        {
+            // Circuit Properties
+            CircuitProperties circuitProperties = tdn.CircuitProperties;
+
+            CSVCircuitProperties rec = new CSVCircuitProperties() { Property = "Share Circuit Locations", Value = circuitProperties.ShareCircuitLocations.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Import Circuits As Clean", Value = circuitProperties.ImportCircuitAsClean.ToString() };
+            csvCircuitProps.Add(rec);
+           
+            // Trace Configurations
+            TraceConfiguration traceConfiguration = tdn.TraceConfiguration;
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Num Paths", Value = circuitProperties.NumPaths.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Max Hops", Value = circuitProperties.MaxHops.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Include Containers", Value = traceConfiguration.IncludeContainers.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Include Content", Value = traceConfiguration.IncludeContent.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Include Structures", Value = traceConfiguration.IncludeStructures.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Include Barrier Features", Value = traceConfiguration.IncludeBarriersWithResults.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Validate Locatability", Value = traceConfiguration.ValidateLocatability.ToString() };
+            csvCircuitProps.Add(rec);
+
+            rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Apply Traversability", Value = traceConfiguration.Traversability.Scope.ToString() };
+            csvCircuitProps.Add(rec);
+
+            // Function Barriers
+            IReadOnlyList<FunctionBarrier> functionBarriers = traceConfiguration.Traversability.FunctionBarriers;
+            foreach (FunctionBarrier functionBarrier in functionBarriers)
+            {
+                rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Function Barrier", Value = functionBarrier.ToString() };
+                csvCircuitProps.Add(rec);
+            }
+
+            // Propagators
+            IReadOnlyList<Propagator> propagatorList = traceConfiguration.Propagators;
+            foreach (Propagator propagator in propagatorList)
+            {
+                rec = new CSVCircuitProperties() { Property = "Trace Configuration", Descriptor = "Propagator", Value = propagator.ToString() };
+                csvCircuitProps.Add(rec);   
+            }
+
+            CSVCircuitProperties emptyRec = new CSVCircuitProperties();
+            csvCircuitProps.Add(emptyRec);
         }
 
         private static void ColorSets(TelecomDomainNetwork tdn, ref List<CSVColorSets> csvColorSets)
@@ -748,6 +820,16 @@ namespace UtilityNetworkPropertiesExtractor
             public string Descriptor { get; set; }
             public string Value { get; set; }
         }
+
+        private class CSVCircuitProperties
+        {
+            public string CircuitProperties { get; set; }
+            public string Property { get; set; }
+            public string Descriptor { get; set; }
+            public string Value { get; set; }
+
+        }
+
 
         private class CSVColorSets
         {
