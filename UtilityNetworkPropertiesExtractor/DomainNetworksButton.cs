@@ -403,7 +403,6 @@ namespace UtilityNetworkPropertiesExtractor
                 }
             }
 
-
             CSVWavelength emptyRec = new CSVWavelength();
             csvWavelengths.Add(emptyRec);
         }
@@ -457,14 +456,17 @@ namespace UtilityNetworkPropertiesExtractor
                     DomainNetworkID = domainNetwork.ID.ToString(),
                     DomainName = domainNetwork.Name,
                     Alias = domainNetwork.Alias,
-                    TierDefinition = domainNetwork.TierDefinition.ToString(),
-                    SubnetworkControllerType = domainNetwork.SubnetworkControllerType.ToString()
                 };
 
                 if (domainNetwork is TelecomDomainNetwork tdn)
-                    networkRec.DomainNetworkType = "Telecom Domain Network";
+                    networkRec.DomainNetworkType = "Telecom";
+
                 else
-                    networkRec.DomainNetworkType = "Traditional Domain Network";
+                {
+                    networkRec.DomainNetworkType = "Traditional";
+                    networkRec.TierDefinition = domainNetwork.TierDefinition.ToString();
+                    networkRec.SubnetworkControllerType = domainNetwork.SubnetworkControllerType.ToString();
+                }
 
                 myDomainNetworksCSVList.Add(networkRec);
 
@@ -496,7 +498,9 @@ namespace UtilityNetworkPropertiesExtractor
                 }
             }
 
+            // Add 2 empty records to make reading the CSV layout easier
             CSVLayoutDomainNetworks rec = new CSVLayoutDomainNetworks();
+            myDomainNetworksCSVList.Add(rec);
             myDomainNetworksCSVList.Add(rec);
         }
 
@@ -544,20 +548,11 @@ namespace UtilityNetworkPropertiesExtractor
                     };
                     tierInfoCSVList.Add(rec);
 
-                    rec = new CSVLayoutTierInfo()
-                    {
-                        TierName = tier.Name,
-                        Descriptor = "Propagators",
-                    };
-                    tierInfoCSVList.Add(rec);
-
                     IReadOnlyList<Propagator> propagatorList = tier.GetTraceConfiguration().Propagators;
                     foreach (Propagator propagator in propagatorList)
                     {
                         //Propagator examples
-                        //1.  Phases Current[phasessub] BitwiseAndIncludesAny ABCN phasesenergized
-                        //2.  Phases Current BitwiseAndIncludesAny ABCN 
-                        //3.  nomvoltage MaxLessThanEqual 250000 curvoltage
+                        //  E:Phases Propagated[E:Phases Substitution] BitwiseAndIncludesAny I,II,III or ABC or abc phasesenergized
 
                         string propagatorValue = propagator.Value.ToString();
                         CodedValueDomain cvd = propagator.NetworkAttribute.Domain as CodedValueDomain;
@@ -571,23 +566,18 @@ namespace UtilityNetworkPropertiesExtractor
                         rec = new CSVLayoutTierInfo()
                         {
                             TierName = tier.Name,
+                            Descriptor = "Propagators",
                             Value = Common.EncloseStringInDoubleQuotes(propagator.NetworkAttribute.Name + substitutionAttribute + propagator.PropagatorFunction + propagator.Operator + " " + propagatorValue + " " + propagator.PersistedField?.Name)
                         };
                         tierInfoCSVList.Add(rec);
                     }
-
-                    rec = new CSVLayoutTierInfo()
-                    {
-                        TierName = tier.Name,
-                        Descriptor = "Summaries",
-                    };
-                    tierInfoCSVList.Add(rec);
 
                     for (int i = 0; i < tier.GetTraceConfiguration().Functions.Count; i++)
                     {
                         rec = new CSVLayoutTierInfo()
                         {
                             TierName = tier.Name,
+                            Descriptor = "Summaries",
                             Value = tier.GetTraceConfiguration().Functions[i].ToString() + " " + tier.GetTraceConfiguration().Functions[i].Condition?.ToString() + " " + tier.GetTraceConfiguration().Functions[i].PersistedField?.Name
                         };
                         tierInfoCSVList.Add(rec);
